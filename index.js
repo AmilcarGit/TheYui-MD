@@ -99,7 +99,7 @@ async function startMegumi() {
       forwardingScore: 999,
       isForwarded: true,
       forwardedNewsletterMessageInfo: {
-        newsletterJid: "120363407253203904@newsletter",
+        newsletterJid: "120363514709217389@newsletter",
         newsletterName: config.botName,
         serverMessageId: 143,
       },
