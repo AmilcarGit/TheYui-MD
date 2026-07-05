@@ -129,65 +129,23 @@ async function startMegumi() {
         )
       );
 
-      const esperarSocketListo = async (maxEsperaMs = 20000) => {
-        const inicio = Date.now();
-        while (Date.now() - inicio < maxEsperaMs) {
-          if (sock.ws?.readyState === 1) return true; // 1 = OPEN
-          await new Promise((r) => setTimeout(r, 300));
-        }
-        return false;
-      };
-
-      (async () => {
-        console.log(
-          chalk.yellow("\n⏳ Esperando conexión con WhatsApp (puede tardar si tu internet va lento)...")
-        );
-
-        const listo = await esperarSocketListo();
-        if (!listo) {
+      setTimeout(async () => {
+        try {
+          const code = await sock.requestPairingCode(numero.trim());
           console.log(
-            chalk.red(
-              "❌ No se pudo establecer conexión a tiempo. Revisa tu internet (parece muy lento o inestable) e inténtalo de nuevo."
+            chalk.greenBright(
+              `\n✅ Tu código de vinculación es: `
+            ) + chalk.bold.white(code)
+          );
+          console.log(
+            chalk.gray(
+              "Ve a WhatsApp > Dispositivos vinculados > Vincular con número de teléfono, e ingresa el código.\n"
             )
           );
-          return;
+        } catch (err) {
+          console.log(chalk.red("❌ Error solicitando el código de vinculación:"), err);
         }
-
-        const intentarPedirCodigo = async (intentosRestantes = 3) => {
-          try {
-            const code = await sock.requestPairingCode(numero.trim());
-            console.log(
-              chalk.greenBright(
-                `\n✅ Tu código de vinculación es: `
-              ) + chalk.bold.white(code)
-            );
-            console.log(
-              chalk.gray(
-                "Ve a WhatsApp > Dispositivos vinculados > Vincular con número de teléfono, e ingresa el código.\n"
-              )
-            );
-          } catch (err) {
-            if (intentosRestantes > 0) {
-              console.log(
-                chalk.yellow(
-                  `⚠️ Fallo al pedir el código, reintentando... (${intentosRestantes} intento(s) restante(s))`
-                )
-              );
-              await new Promise((r) => setTimeout(r, 2000));
-              await intentarPedirCodigo(intentosRestantes - 1);
-            } else {
-              console.log(chalk.red("❌ Error solicitando el código de vinculación:"), err);
-              console.log(
-                chalk.gray(
-                  "Sugerencias: verifica tu conexión a internet, borra la carpeta 'session' y vuelve a intentar, o usa la opción de código QR."
-                )
-              );
-            }
-          }
-        };
-
-        await intentarPedirCodigo();
-      })();
+      }, 3000);
     } else {
       console.log(
         chalk.yellow(
@@ -334,18 +292,8 @@ async function startMegumi() {
 
     const context = { sender, chatId, body, allPlugins: plugins };
 
-    const configGrupoActual = esGrupo ? obtenerConfigGrupo(chatId) : null;
-    const botApagadoEnGrupo =
-      esGrupo && configGrupoActual && configGrupoActual.activo === false;
-
     for (const plugin of plugins) {
       if (plugin.command.includes(primeraPalabra)) {
-        // Si el bot está apagado en este grupo, se ignora cualquier
-        // comando excepto los marcados con bypassApagado (ej. "bot on").
-        if (botApagadoEnGrupo && !plugin.bypassApagado) {
-          break;
-        }
-
         try {
           const puedeContinuar = await pasaFiltros(sock, msg, plugin, context);
           if (!puedeContinuar) break;
