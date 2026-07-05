@@ -1,6 +1,6 @@
 import { config } from "../config.js";
 
-const { baseUrl, apiKey } = config.api;
+const { baseUrl, apiKey } = config.apis.edward;
 
 function formatearDuracion(segundos) {
   if (!segundos && segundos !== 0) return "Desconocida";
