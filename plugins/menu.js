@@ -15,7 +15,7 @@ async function obtenerImagenMenu() {
     imagenMenuCache = fs.readFileSync(MENU_IMAGE_PATH);
     return imagenMenuCache;
   } catch (err) {
-    // Si por algo no está el archivo, el menú se manda solo con texto.
+    
     return null;
   }
 }
