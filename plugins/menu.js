@@ -26,6 +26,7 @@ const ICONOS_CATEGORIA = {
   Owner: "▲",
   Otros: "◇", 
   Anime: "𖤐",
+  Info: "☙", 
 };
 
 function formatearUptime(segundos) {
