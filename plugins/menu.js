@@ -13,8 +13,7 @@ async function obtenerImagenMenu() {
     imagenMenuCache = buffer;
     return buffer;
   } catch (err) {
-    // Si falla la descarga (ej. sin internet en ese instante),
-    // devolvemos null y el menú se manda solo con texto esa vez.
+    
     return null;
   }
 }
