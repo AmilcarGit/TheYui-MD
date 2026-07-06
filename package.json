@@ -1,7 +1,7 @@
 {
-  "name": "TheKael-MD",
+  "name": "TheYui-MD",
   "version": "1.0.0",
-  "description": "TheKael-MD - Bot de WhatsApp base, sin prefijo, con carga dinámica de plugins.",
+  "description": "TheYui-MD - Bot de WhatsApp base, sin prefijo, con carga dinámica de plugins.",
   "main": "index.js",
   "type": "module",
   "author": "AmilcarGit",
