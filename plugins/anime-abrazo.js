@@ -4,6 +4,8 @@ export default {
   description: "Envía un abrazo anime. Si respondes a alguien, lo abrazas.",
   run: async (sock, msg, args, context) => {
     const { chatId, sender } = context;
+    console.log("📌 Comando hug ejecutado por", sender);
+
     let mencionado = null;
 
     if (msg.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
@@ -24,9 +26,17 @@ export default {
     }
 
     try {
-      const response = await fetch("https://api.waifu.pics/sfw/hug");
-      const data = await response.json();
-      const imageUrl = data.url;
+      let imageUrl = null;
+      try {
+        const response = await fetch("https://api.waifu.pics/sfw/hug");
+        const data = await response.json();
+        imageUrl = data.url;
+      } catch (e) {
+        const response2 = await fetch("https://nekos.life/api/v2/img/hug");
+        const data2 = await response2.json();
+        imageUrl = data2.url;
+      }
+
       if (!imageUrl) throw new Error("No se obtuvo imagen");
 
       const mentions = [sender];
