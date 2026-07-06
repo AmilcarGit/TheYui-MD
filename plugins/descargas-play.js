@@ -12,7 +12,7 @@ function formatearDuracion(segundos) {
 }
 
 export default {
-  command: ["play"],
+  command: ["play", "mp3", " musica"],
   category: "Descargas",
   description: "Busca una canción en YouTube y la envía en audio. Uso: play <nombre de la canción>",
   run: async (sock, msg, args, context) => {
