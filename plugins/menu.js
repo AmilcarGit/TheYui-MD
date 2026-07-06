@@ -2,9 +2,6 @@ import { config } from "../config.js";
 
 const MENU_IMAGE = "https://files.catbox.moe/1farsq.webp";
 
-// Guardamos la imagen en memoria la primera vez que se usa,
-// así no se vuelve a descargar de internet en cada "menu" (más rápido
-// con conexiones lentas).
 let imagenMenuCache = null;
 
 async function obtenerImagenMenu() {
