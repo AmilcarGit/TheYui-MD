@@ -1,3 +1,5 @@
+import { resolverParticipante } from "../middlewares.js";
+
 export default {
   command: ["perfil", "profile"],
   category: "Info",
@@ -28,11 +30,7 @@ export default {
 
     if (esGrupo) {
       try {
-        const metadata = await sock.groupMetadata(chatId);
-        const participante = metadata.participants.find((p) => {
-          const pNum = String(p.id).split("@")[0].split(":")[0];
-          return pNum === numero;
-        });
+        const participante = await resolverParticipante(sock, chatId, numero);
         esAdminEnGrupo = Boolean(participante?.admin);
       } catch (e) {
         esAdminEnGrupo = null;
