@@ -24,27 +24,41 @@ function barraProgreso(porcentaje = 100, largo = 15) {
 
 function mensajeCargando() {
   const estados = [
-    "🔄 Inicializando motores...",
-    "🔍 Rastreando en la red neuronal...",
-    "📡 Conectando con el servidor de descargas...",
-    "⚡ Procesando paquete de datos...",
-    "🎯 Preparando el video para entrega...",
+    "🔄 Inicializando motores de descarga...",
+    "🔍 Analizando enlace de YouTube...",
+    "📡 Conectando con el servidor...",
+    "⚡ Procesando paquete de video...",
+    "🎯 Preparando archivo para envío...",
   ];
   return estados[Math.floor(Math.random() * estados.length)];
+}
+
+function esLinkYouTube(url) {
+  const pattern = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/i;
+  return pattern.test(url);
 }
 
 export default {
   command: ["video", "ytvideo", "mp4"],
   category: "Descargas",
-  description: "Busca un video en YouTube y lo envía con estilo. Uso: video <nombre del video>",
+  description: "Descarga un video de YouTube desde un enlace. Uso: video <link de YouTube>",
   run: async (sock, msg, args, context) => {
     const { chatId } = context;
-    const query = args.join(" ").trim();
+    const url = args[0]?.trim();
 
-    if (!query) {
+    if (!url) {
       await sock.sendMessage(
         chatId,
-        { text: "❀ Escribe el nombre del video.\nEjemplo: *video* my heart will go on" },
+        { text: "❀ Envía el enlace del video de YouTube.\nEjemplo: *video* https://youtu.be/abc123" },
+        { quoted: msg }
+      );
+      return;
+    }
+
+    if (!esLinkYouTube(url)) {
+      await sock.sendMessage(
+        chatId,
+        { text: "❌ El enlace no es válido. Solo se aceptan URLs de YouTube." },
         { quoted: msg }
       );
       return;
@@ -53,27 +67,11 @@ export default {
     try {
       await sock.sendMessage(
         chatId,
-        { text: `╔═══════════════════════════════╗\n║  🚀 THEKAEL-MD · VIDEO FINDER  ║\n╚═══════════════════════════════╝\n\n${mensajeCargando()}` },
+        { text: `╔═══════════════════════════════╗\n║  🚀 THEKAEL-MD · DOWNLOADER    ║\n╚═══════════════════════════════╝\n\n${mensajeCargando()}` },
         { quoted: msg }
       );
 
-      const searchUrl = `${baseUrl}/api/search/youtube?apiKey=${apiKey}&query=${encodeURIComponent(query)}`;
-      const searchRes = await fetch(searchUrl);
-      const searchData = await searchRes.json();
-
-      const resultados = searchData.result || searchData.data || searchData.results || [];
-      const primerVideo = Array.isArray(resultados) ? resultados[0] : resultados;
-
-      if (!primerVideo || !primerVideo.url) {
-        await sock.sendMessage(
-          chatId,
-          { text: "❌ No encontré resultados para esa búsqueda." },
-          { quoted: msg }
-        );
-        return;
-      }
-
-      const downloadUrl = `${baseUrl}/api/download/ytvideo?url=${encodeURIComponent(primerVideo.url)}&apiKey=${apiKey}`;
+      const downloadUrl = `${baseUrl}/api/download/ytvideo?url=${encodeURIComponent(url)}&apiKey=${apiKey}`;
       const downloadRes = await fetch(downloadUrl);
       const downloadData = await downloadRes.json();
 
@@ -82,13 +80,13 @@ export default {
       if (!downloadData.status || !info || !info.download_url) {
         await sock.sendMessage(
           chatId,
-          { text: "❌ No pude obtener el video, intenta con otro nombre." },
+          { text: "❌ No pude descargar el video. Verifica que el enlace sea válido." },
           { quoted: msg }
         );
         return;
       }
 
-      const titulo = info.title || primerVideo.title || query;
+      const titulo = info.title || "Video sin título";
       const duracion = formatearDuracion(info.duration);
       const tamaño = bytesToMB(info.size);
       const vistas = info.views ? new Intl.NumberFormat().format(info.views) : "N/A";
@@ -96,7 +94,7 @@ export default {
 
       if (info.thumbnail) {
         const caption = `╔═══════════════════════════════╗
-║  🎬 *VIDEO ENCONTRADO*        ║
+║  🎬 *VIDEO LISTO*             ║
 ╠═══════════════════════════════╣
 ║  📌 Título: ${titulo.slice(0, 40)}${titulo.length > 40 ? "…" : ""}
 ║  ⏱️  Duración: ${duracion}
@@ -106,7 +104,7 @@ export default {
 ║  📊 Calidad: ${info.quality || "Media"}
 ║  ───────────────────────────
 ║  ${barraProgreso(100)} 100%
-║  ✅ Listo para enviar...
+║  ✅ Enviando video...
 ╚═══════════════════════════════╝
 ⚡ TheKael-MD · Tecnología de vanguardia`;
 
@@ -134,7 +132,7 @@ export default {
       console.log("❌ Error en el comando video:", err);
       await sock.sendMessage(
         chatId,
-        { text: "❌ Ocurrió un error buscando o descargando el video." },
+        { text: "❌ Ocurrió un error al procesar el video." },
         { quoted: msg }
       );
     }
