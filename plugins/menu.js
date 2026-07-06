@@ -1,19 +1,23 @@
 import { config } from "../config.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const MENU_IMAGE = "https://files.catbox.moe/1farsq.webp";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MENU_IMAGE_PATH = path.join(__dirname, "..", "assets", "menu.jpg");
 
+// Guardamos la imagen en memoria la primera vez que se usa,
+// así no se vuelve a leer el archivo en cada "menu" (más rápido).
 let imagenMenuCache = null;
 
 async function obtenerImagenMenu() {
   if (imagenMenuCache) return imagenMenuCache;
 
   try {
-    const respuesta = await fetch(MENU_IMAGE);
-    const buffer = Buffer.from(await respuesta.arrayBuffer());
-    imagenMenuCache = buffer;
-    return buffer;
+    imagenMenuCache = fs.readFileSync(MENU_IMAGE_PATH);
+    return imagenMenuCache;
   } catch (err) {
-    
+    // Si por algo no está el archivo, el menú se manda solo con texto.
     return null;
   }
 }
