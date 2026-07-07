@@ -1,4 +1,4 @@
-rm -rf session
+
   "name": "TheYui-MD",
   "version": "1.0.0",
   "description": "TheYui-MD - Bot de WhatsApp base, sin prefijo, con carga dinámica de plugins.",
