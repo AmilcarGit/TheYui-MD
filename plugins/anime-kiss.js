@@ -4,19 +4,13 @@ export default {
   description: "Envía un beso anime. Si respondes a alguien, le das un beso.",
   run: async (sock, msg, args, context) => {
     const { chatId, sender } = context;
-    console.log("📌 Comando kiss ejecutado por", sender);
 
     let mencionado = null;
 
-    if (msg.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
-      const mentions = msg.message.extendedTextMessage.contextInfo.mentionedJid;
-      if (mentions && mentions.length > 0) {
-        mencionado = mentions[0];
-        console.log("👤 Mencionado:", mencionado);
-      }
+    if (msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length) {
+      mencionado = msg.message.extendedTextMessage.contextInfo.mentionedJid[0];
     } else if (msg.message?.extendedTextMessage?.contextInfo?.participant) {
       mencionado = msg.message.extendedTextMessage.contextInfo.participant;
-      console.log("👤 Respondiendo a:", mencionado);
     }
 
     const usuario = sender.split("@")[0];
@@ -24,24 +18,19 @@ export default {
 
     if (mencionado) {
       const mencionadoNum = mencionado.split("@")[0];
-      texto = `@${usuario} le dio un beso a @${mencionadoNum} 💋`;
+      texto = `@${usuario} le dio un beso a @${mencionadoNum} 💋💕`;
     }
 
     try {
-      // Primero intentamos con waifu.pics
       let imageUrl = null;
       try {
         const response = await fetch("https://api.waifu.pics/sfw/kiss");
         const data = await response.json();
         imageUrl = data.url;
-        console.log("✅ Imagen obtenida de waifu.pics:", imageUrl);
       } catch (e) {
-        console.log("⚠️ Falló waifu.pics, intentando con nekos.life");
-        // Fallback a nekos.life
         const response2 = await fetch("https://nekos.life/api/v2/img/kiss");
         const data2 = await response2.json();
         imageUrl = data2.url;
-        console.log("✅ Imagen obtenida de nekos.life:", imageUrl);
       }
 
       if (!imageUrl) throw new Error("No se obtuvo imagen de ninguna API");
@@ -59,7 +48,6 @@ export default {
         { quoted: msg }
       );
     } catch (error) {
-      console.error("❌ Error en comando kiss:", error);
       await sock.sendMessage(
         chatId,
         {
