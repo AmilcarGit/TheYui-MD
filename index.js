@@ -28,6 +28,16 @@ const rl = readline.createInterface({
 const question = (text) =>
   new Promise((resolve) => rl.question(text, resolve));
 
+// Evita que un error inesperado (ej. una petición de red que falla al
+// reconectar) tumbe todo el proceso y provoque reinicios en cadena.
+process.on("uncaughtException", (err) => {
+  console.log(chalk.red("❌ Error no controlado (uncaughtException):"), err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.log(chalk.red("❌ Promesa rechazada sin manejar (unhandledRejection):"), err);
+});
+
 let plugins = [];
 const groupMetadataCache = new Map();
 
@@ -218,7 +228,12 @@ async function startBot() {
         )
       );
 
-      if (shouldReconnect) startBot();
+      if (shouldReconnect) {
+        startBot().catch((err) => {
+          console.log(chalk.red("❌ Error al reconectar, reintentando en 5s:"), err);
+          setTimeout(() => startBot().catch(() => {}), 5000);
+        });
+      }
     } else if (connection === "open") {
       console.log(
         chalk.greenBright(
@@ -311,7 +326,7 @@ async function startBot() {
 
     const esGrupo = chatId.endsWith("@g.us");
     const contieneLink =
-  /(https?:\/\/|www\.)[^\s]+/i.test(body);
+      /(https?:\/\/|chat\.whatsapp\.com|wa\.me\/|www\.)/i.test(body);
 
     if (esGrupo && contieneLink) {
       const configGrupo = obtenerConfigGrupo(chatId);
@@ -377,4 +392,6 @@ async function startBot() {
   });
 }
 
-startBot();
+startBot().catch((err) => {
+  console.log(chalk.red("❌ Error al iniciar el bot:"), err);
+});
