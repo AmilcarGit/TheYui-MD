@@ -5,7 +5,7 @@ export default {
   category: "Owner",
   description:
     "Administra subbots: subbot <número> (vincular), subbots (listar), delsubbot <número> (eliminar).",
-  privateOnly: true,
+  privateOnly: false,
   ownerOnly: true,
 
   run: async (sock, msg, args, context) => {
