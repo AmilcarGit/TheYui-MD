@@ -12,27 +12,25 @@ export default {
 
     if (opcion !== "on" && opcion !== "off") {
       const actual = obtenerConfigGrupo(chatId);
-      await sock.sendMessage(
-        chatId,
-        {
-          text:
-            `❀ Estado actual del welcome: *${actual.welcome ? "activado" : "desactivado"}*\n\n` +
-            "Uso: *welcome on* / *welcome off*",
-        },
-        { quoted: msg }
-      );
+
+      const texto =
+        `╭─🌹 *BIENVENIDA/DESPEDIDA* 🌹\n` +
+        `│ 🦋 Estado actual: *${actual.welcome ? "Activada ✅" : "Desactivada ❌"}*\n` +
+        `╰────────────────╯\n\n` +
+        `💕 *welcome on* — activarla\n` +
+        `💕 *welcome off* — desactivarla`;
+
+      await sock.sendMessage(chatId, { text: texto }, { quoted: msg });
       return;
     }
 
     const nuevoValor = opcion === "on";
     actualizarConfigGrupo(chatId, { welcome: nuevoValor });
 
-    await sock.sendMessage(
-      chatId,
-      {
-        text: `✅ Bienvenida/despedida ${nuevoValor ? "activada" : "desactivada"} en este grupo.`,
-      },
-      { quoted: msg }
-    );
+    const texto = nuevoValor
+      ? `╭─🌹 *BIENVENIDA/DESPEDIDA* 🌹\n│ ✅ Activada en este grupo\n│ 🦋 Saludaré a quien entre o salga\n╰────────────────╯`
+      : `╭─🌹 *BIENVENIDA/DESPEDIDA* 🌹\n│ ❌ Desactivada en este grupo\n│ 🦋 Ya no enviaré esos mensajes\n╰────────────────╯`;
+
+    await sock.sendMessage(chatId, { text: texto }, { quoted: msg });
   },
 };
