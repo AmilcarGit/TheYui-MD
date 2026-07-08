@@ -6,7 +6,7 @@ import fs from "fs";
 import path from "path";
 
 import { config } from "./config.js";
-import { pasaFiltros, esAdminDeGrupo } from "./middlewares.js";
+import { pasaFiltros, esAdminDeGrupo, botEsAdmin } from "./middlewares.js";
 import { obtenerConfigGrupo } from "./groupSettings.js";
 
 const {
@@ -334,10 +334,36 @@ async function iniciarSocketSubbot(numeroLimpio, sessionFolder, registro, { onPa
             await sock.sendMessage(chatId, { delete: msg.key });
           } catch (_) {}
 
-          await sock.sendMessage(chatId, {
-            text: `🚫 @${numeroLimpioSender} no se permiten enlaces en este grupo.`,
-            mentions: [sender],
-          });
+          // Pausa corta para no golpear la API de WhatsApp muy seguido
+          // (evita el error 429 "rate-overlimit" ante ráfagas de enlaces).
+          await new Promise((r) => setTimeout(r, 800));
+
+          let botAdmin = false;
+          try {
+            botAdmin = await botEsAdmin(sock, chatId);
+          } catch (_) {}
+
+          if (botAdmin) {
+            try {
+              await sock.groupParticipantsUpdate(chatId, [sender], "remove");
+              await sock.sendMessage(chatId, {
+                text: `🚫 @${numeroLimpioSender} fue *expulsado* por enviar enlaces no permitidos.`,
+                mentions: [sender],
+              });
+            } catch (err) {
+              await sock.sendMessage(chatId, {
+                text: `🚫 @${numeroLimpioSender} no se permiten enlaces en este grupo (no pude expulsarlo).`,
+                mentions: [sender],
+              });
+            }
+          } else {
+            await sock.sendMessage(chatId, {
+              text:
+                `🚫 @${numeroLimpioSender} no se permiten enlaces en este grupo.\n` +
+                `⚠️ Hazme *administrador* para que pueda expulsar automáticamente a quien los envíe.`,
+              mentions: [sender],
+            });
+          }
 
           return;
         }
