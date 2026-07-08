@@ -1,6 +1,6 @@
 export default {
   command: ["ping", "speed"],
-  category: "General",
+  category: "Info",
   description: "Muestra qué tan rápido responde el bot en este momento.",
 
   run: async (sock, msg, args, context) => {
