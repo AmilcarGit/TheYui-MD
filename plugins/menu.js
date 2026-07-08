@@ -25,7 +25,6 @@ const ICONOS_CATEGORIA = {
   Anime: "💕",
   Owner: "💎",
   Info: "🎀",
-  Media: "🌸", 
   Otros: "✨",
   Diversión: "🎮",
   Utilidades: "🔧",
@@ -69,28 +68,23 @@ export default {
     const uptime = formatearUptime(process.uptime());
     const nombresCategorias = Object.keys(categorias).sort();
 
-    let texto = `🌸┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈🌸\n`;
-    texto += `   ✨ *${config.botName.toUpperCase()}* ✨\n`;
-    texto += `   _Tu waifu inteligente_ 💕\n`;
-    texto += `🌸┈┈┈┈┈ACERCA DE MÍ.┈┈┈┈┈┈🌸
-
-Hola, soy TheYui-MD🌹🦋
-
-Tu asistente waifu😍, creada para hacer tu día más fácil y divertido. Siempre contigo🌷, siempre leal🌹\n\n`;
-
+    let texto = `🌸┈┈┈┈┈┈┈┈┈┈┈┈┈🌸\n`;
+    texto += `  ✨ *${config.botName.toUpperCase()}* ✨\n`;
+    texto += `  _Tu waifu inteligente_ 💕\n`;
+    texto += `🌸┈┈┈┈┈┈┈┈┈┈┈┈┈┈🌸\n\n`;
     texto += `╭─🎀 *ESTADÍSTICAS* 🎀\n`;
-    texto += `│ 👤 Usuario: @${numero}\n`;
-    texto += `│ 💎 Creador: ${config.creator}\n`;
-    texto += `│ 💵 Moneda: Yui\n`;
-    texto += `│ ⏱️ Uptime: ${uptime}\n`;
-    texto += `│ ⚡ Comandos: ${totalComandos}\n`;
-    texto += `│ 📦 Plugins: ${allPlugins.length}\n`;
+    texto += `│ 👤 @${numero}\n`;
+    texto += `│ 💎 ${config.creator}\n`;
+    texto += `│ 💵 Yui  │ ⏱️ ${uptime}\n`;
+    texto += `│ ⚡ ${totalComandos} cmd  │ 📦 ${allPlugins.length} plugins\n`;
     texto += `│ 🕐 ${fecha}\n`;
-    texto += `╰────────────────────────╯\n`;
+    texto += `╰────────────────────╯\n\n`;
+
+    texto += `🌹 *MIS COMANDOS* 🦋\n`;
 
     for (const categoria of nombresCategorias) {
       const icono = ICONOS_CATEGORIA[categoria] || "✨";
-      texto += `\n╭─${icono} *${categoria.toUpperCase()}* ${icono}\n`;
+      texto += `\n╭─${icono} *${categoria}* ${icono}\n`;
       for (const plugin of categorias[categoria]) {
         const comandoPrincipal = plugin.command[0];
         const alias = plugin.command.slice(1).length > 0
@@ -99,12 +93,13 @@ Tu asistente waifu😍, creada para hacer tu día más fácil y divertido. Siemp
         texto += `│ ➤ *${comandoPrincipal}*${alias}\n`;
         texto += `│   ${plugin.description || "Sin descripción"}\n`;
       }
-      texto += `╰────────────────────────╯\n`;
+      texto += `╰────────────────────╯\n`;
     }
 
-    texto += `\n🦋┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈🦋\n`;
+    texto += `\n🦋┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈🦋\n`;
     texto += `💕 _Sin prefijo — escribe el comando directo_\n`;
-    texto += `🌹 *${config.botName}* — Inteligente · Rápida · Segura · Leal 🌹❦`;
+    texto += `📚 _Bot hecho con fines educativos_\n`;
+    texto += `🌹 *${config.botName}* — Leal · Rápida · Inteligente 🌹`;
 
     const imagen = await obtenerImagenMenu();
     if (imagen) {
