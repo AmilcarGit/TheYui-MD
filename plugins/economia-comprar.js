@@ -1,48 +1,42 @@
-import { obtenerUsuario, quitarSaldo, formatearMonto, agregarItem, tieneItem } from "../economyDB.js";
+import { obtenerUsuario, quitarSaldo, formatearMonto, agregarItem, tieneItem, agregarEfecto } from "../economyDB.js";
 
 const ITEMS = [
   {
-    id: "stickers_pack",
-    nombre: "Pack de Stickers de Yui",
-    precio: 500,
-    emoji: "🎀"
-  },
-  {
-    id: "foto_waifu",
-    nombre: "Foto Waifu Personalizada",
+    id: "inversion_basica",
+    nombre: "Inversión Básica",
     precio: 1000,
-    emoji: "🌸"
+    efecto: "interes_basico"
   },
   {
-    id: "rol_waifu",
-    nombre: "Rol Waifu en el grupo",
-    precio: 2000,
-    emoji: "💕"
+    id: "inversion_plus",
+    nombre: "Inversión Plus",
+    precio: 5000,
+    efecto: "interes_plus"
   },
   {
-    id: "cancion_dedicada",
-    nombre: "Canción Dedicada",
-    precio: 1500,
-    emoji: "🎵"
+    id: "vip_oro",
+    nombre: "Pase VIP Oro",
+    precio: 10000,
+    efecto: "vip_oro"
   },
   {
-    id: "super_sticker",
-    nombre: "Super Sticker Animado",
-    precio: 800,
-    emoji: "✨"
+    id: "vip_platino",
+    nombre: "Pase VIP Platino",
+    precio: 25000,
+    efecto: "vip_platino"
   },
   {
-    id: "mensaje_amor",
-    nombre: "Mensaje de Amor Personalizado",
-    precio: 300,
-    emoji: "💌"
+    id: "socio",
+    nombre: "Socio Comercial",
+    precio: 15000,
+    efecto: "socio"
   }
 ];
 
 export default {
   command: ["comprar", "buy"],
   category: "Economia",
-  description: "Compra un item de la tienda usando tu dinero. Uso: comprar <ID>",
+  description: "Compra un item de la tienda. Uso: comprar <ID>",
   run: async (sock, msg, args, context) => {
     const { sender, chatId } = context;
     const numero = sender.split("@")[0].split(":")[0];
@@ -51,7 +45,7 @@ export default {
     if (!id) {
       return await sock.sendMessage(
         chatId,
-        { text: "🌸 Escribe el ID del item que quieres comprar.\nEjemplo: *comprar stickers_pack*\nUsa *tienda* para ver la lista." },
+        { text: "🌸 Escribe el ID del item que quieres comprar.\nEjemplo: *comprar inversion_basica*\nUsa *tienda* para ver la lista." },
         { quoted: msg }
       );
     }
@@ -90,10 +84,16 @@ export default {
     quitarSaldo(numero, item.precio);
     agregarItem(numero, item.id);
 
+    let textoAdicional = "";
+    if (item.efecto) {
+      agregarEfecto(numero, item.efecto);
+      textoAdicional = `\n\n✨ *Efecto activado:* ${item.nombre} aplicado a tu cuenta.`;
+    }
+
     await sock.sendMessage(
       chatId,
       {
-        text: `✅ *Compra exitosa*\n\n${item.emoji} Has comprado *${item.nombre}*\n💵 Gastaste: ${formatearMonto(item.precio)}\n\n💕 ¡Gracias por tu compra! Disfruta tu nuevo item.`,
+        text: `✅ *Compra exitosa*\n\n${item.emoji || "🎁"} Has comprado *${item.nombre}*\n💵 Gastaste: ${formatearMonto(item.precio)}${textoAdicional}\n\n💕 ¡Gracias por tu compra! Disfruta tus beneficios.`,
         mentions: [sender]
       },
       { quoted: msg }
