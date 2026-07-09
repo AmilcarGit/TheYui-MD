@@ -29,7 +29,9 @@ export function obtenerUsuario(numero) {
       banco: 0,
       ultimoDaily: 0,
       ultimoTrabajo: 0,
-      inventario: []
+      inventario: [],
+      efectos: [],
+      ultimoInteres: 0
     }
   );
 }
@@ -102,4 +104,24 @@ export function tieneItem(numero, itemId) {
 export function contarItem(numero, itemId) {
   const items = obtenerInventarioUsuario(numero);
   return items.filter(id => id === itemId).length;
+}
+
+export function agregarEfecto(numero, efectoId) {
+  const usuario = obtenerUsuario(numero);
+  const efectos = usuario.efectos || [];
+  if (!efectos.includes(efectoId)) {
+    efectos.push(efectoId);
+    guardarUsuario(numero, { efectos });
+  }
+  return efectos;
+}
+
+export function tieneEfecto(numero, efectoId) {
+  const usuario = obtenerUsuario(numero);
+  return (usuario.efectos || []).includes(efectoId);
+}
+
+export function obtenerEfectos(numero) {
+  const usuario = obtenerUsuario(numero);
+  return usuario.efectos || [];
 }
