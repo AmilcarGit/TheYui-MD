@@ -120,11 +120,46 @@ export default {
 
       await sock.sendMessage(
         chatId,
+        { text: "📥 Descargando el archivo para verificarlo antes de enviarlo..." },
+        { quoted: msg }
+      );
+
+      const videoRes = await fetch(info.download_url);
+
+      if (!videoRes.ok) {
+        await sock.sendMessage(
+          chatId,
+          { text: `❌ El servidor de descarga respondió con error (${videoRes.status}). Intenta de nuevo más tarde.` },
+          { quoted: msg }
+        );
+        return;
+      }
+
+      const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+
+      // Un MP4 válido siempre trae la firma "ftyp" cerca del inicio del archivo.
+      const firmaValida = videoBuffer.slice(0, 32).includes("ftyp");
+
+      if (videoBuffer.length < 50 * 1024 || !firmaValida) {
+        await sock.sendMessage(
+          chatId,
+          {
+            text:
+              `❌ El archivo que devolvió la API está incompleto o dañado (${(videoBuffer.length / 1024).toFixed(0)} KB). ` +
+              `No lo voy a enviar para que no te llegue roto. Prueba con otro video o más tarde.`,
+          },
+          { quoted: msg }
+        );
+        return;
+      }
+
+      await sock.sendMessage(
+        chatId,
         {
-          document: { url: info.download_url },
+          document: videoBuffer,
           mimetype: "video/mp4",
           fileName: `${titulo.slice(0, 60)}.mp4`,
-          caption: `📹 *${titulo}*\n⏱️ ${duracion} · 📦 ${tamaño}\n\n✨ *TheYui-MD* — Más que un bot, una leyenda.`,
+          caption: `📹 *${titulo}*\n⏱️ ${duracion} · 📦 ${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB\n\n✨ *TheYui-MD* — Más que un bot, una leyenda.`,
         },
         { quoted: msg }
       );
