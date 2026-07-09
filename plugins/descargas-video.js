@@ -1,7 +1,3 @@
-import { config } from "../config.js";
-
-const { baseUrl, apiKey } = config.apis.edward;
-
 function formatearDuracion(segundos) {
   if (!segundos && segundos !== 0) return "Desconocida";
   const min = Math.floor(segundos / 60);
@@ -9,12 +5,6 @@ function formatearDuracion(segundos) {
     .toString()
     .padStart(2, "0");
   return `${min}:${seg}`;
-}
-
-function bytesToMB(bytes) {
-  if (!bytes) return "0 MB";
-  const mb = bytes / (1024 * 1024);
-  return mb.toFixed(2) + " MB";
 }
 
 function barraProgreso(porcentaje = 100, largo = 15) {
@@ -38,6 +28,17 @@ function esLinkYouTube(url) {
   return pattern.test(url);
 }
 
+const API_BASE = "https://dv-yer-api.online/ytmp4";
+const API_KEY = "dvyer673989047548";
+
+function extraerCampo(obj, nombres) {
+  for (const nombre of nombres) {
+    const valor = nombre.split(".").reduce((acc, key) => acc?.[key], obj);
+    if (valor !== undefined && valor !== null && valor !== "") return valor;
+  }
+  return null;
+}
+
 export default {
   command: ["video", "ytvideo", "mp4"],
   category: "Descargas",
@@ -49,7 +50,7 @@ export default {
     if (!url) {
       await sock.sendMessage(
         chatId,
-        { text: "❀ Envía el enlace del video de YouTube.\nEjemplo: *video* https://youtu.be/abc123" },
+        { text: "🦋 Envía el enlace del video de YouTube.\nEjemplo: *video* https://youtu.be/abc123" },
         { quoted: msg }
       );
       return;
@@ -71,47 +72,83 @@ export default {
         { quoted: msg }
       );
 
-      const downloadUrl = `${baseUrl}/api/download/ytvideo?url=${encodeURIComponent(url)}&apiKey=${apiKey}`;
+      const downloadUrl = `${API_BASE}?mode=link&url=${encodeURIComponent(url)}&quality=360p&apikey=${API_KEY}`;
       const downloadRes = await fetch(downloadUrl);
-      const downloadData = await downloadRes.json();
 
-      const info = downloadData.result;
-
-      if (!downloadData.status || !info || !info.download_url) {
+      if (!downloadRes.ok) {
         await sock.sendMessage(
           chatId,
-          { text: "❌ No pude descargar el video. Verifica que el enlace sea válido." },
+          { text: `❌ La API de descarga respondió con error (${downloadRes.status}). Intenta de nuevo más tarde.` },
           { quoted: msg }
         );
         return;
       }
 
-      const titulo = info.title || "Video sin título";
-      const duracion = formatearDuracion(info.duration);
-      const tamaño = bytesToMB(info.size);
-      const vistas = info.views ? new Intl.NumberFormat().format(info.views) : "N/A";
-      const likes = info.likes ? new Intl.NumberFormat().format(info.likes) : "N/A";
+      const downloadData = await downloadRes.json();
 
-      if (info.thumbnail) {
+      if (downloadData.ok === false) {
+        console.log("⚠️ dv-yer-api devolvió ok:false:", JSON.stringify(downloadData));
+        await sock.sendMessage(
+          chatId,
+          { text: `❌ La API no pudo procesar ese video: ${downloadData.error || downloadData.message || "sin detalle"}` },
+          { quoted: msg }
+        );
+        return;
+      }
+
+      const videoLink = extraerCampo(downloadData, [
+        "download_url",
+        "url",
+        "stream_url",
+        "download_url_full",
+        "result.download_url",
+        "data.url",
+      ]);
+
+      const titulo = extraerCampo(downloadData, ["title", "result.title", "data.title"]) || "Video sin título";
+
+      const duracionSegundos = extraerCampo(downloadData, [
+        "duration",
+        "result.duration",
+        "data.duration",
+      ]);
+
+      const thumbnail = extraerCampo(downloadData, ["thumbnail", "result.thumbnail", "data.thumbnail"]);
+      const calidad = extraerCampo(downloadData, ["quality", "quality_requested"]) || "360p";
+
+      if (!videoLink) {
+        console.log("⚠️ Respuesta de dv-yer-api sin campo de descarga reconocido:", JSON.stringify(downloadData));
+        await sock.sendMessage(
+          chatId,
+          {
+            text:
+              "❌ No pude leer el enlace de descarga en la respuesta de la API. " +
+              "El formato de esa API no coincide con lo esperado (revisa la consola del bot para ver la respuesta cruda).",
+          },
+          { quoted: msg }
+        );
+        return;
+      }
+
+      const duracion = duracionSegundos ? formatearDuracion(duracionSegundos) : null;
+      const lineaDuracion = duracion ? `║  ⏱️  Duración: ${duracion}\n` : "";
+
+      if (thumbnail) {
         const caption = `╔═══════════════════╗
 ║  🎬 *VIDEO LISTO*      ║
 ╠════════════════════╣
 ║  📌 Título: ${titulo.slice(0, 40)}${titulo.length > 40 ? "…" : ""}
-║  ⏱️  Duración: ${duracion}
-║  📦 Tamaño: ${tamaño}
-║  👁️  Vistas: ${vistas}
-║  👍 Likes: ${likes}
-║  📊 Calidad: ${info.quality || "Media"}
+${lineaDuracion}║  📊 Calidad: ${calidad}
 ║  ───────────────────────
 ║  ${barraProgreso(100)} 100%
-║  ✅ Enviando video...
+║  ✅ Verificando y enviando video...
 ╚═════════════════════════╝
 ⚡ TheYui-MD · Tecnología de vanguardia`;
 
         await sock.sendMessage(
           chatId,
           {
-            image: { url: info.thumbnail },
+            image: { url: thumbnail },
             caption: caption,
           },
           { quoted: msg }
@@ -124,7 +161,7 @@ export default {
         { quoted: msg }
       );
 
-      const videoRes = await fetch(info.download_url);
+      const videoRes = await fetch(videoLink);
 
       if (!videoRes.ok) {
         await sock.sendMessage(
@@ -136,8 +173,6 @@ export default {
       }
 
       const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
-
-      // Un MP4 válido siempre trae la firma "ftyp" cerca del inicio del archivo.
       const firmaValida = videoBuffer.slice(0, 32).includes("ftyp");
 
       if (videoBuffer.length < 50 * 1024 || !firmaValida) {
@@ -159,7 +194,7 @@ export default {
           document: videoBuffer,
           mimetype: "video/mp4",
           fileName: `${titulo.slice(0, 60)}.mp4`,
-          caption: `📹 *${titulo}*\n⏱️ ${duracion} · 📦 ${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB\n\n✨ *TheYui-MD* — Más que un bot, una leyenda.`,
+          caption: `📹 *${titulo}*\n${duracion ? `⏱️ ${duracion} · ` : ""}📦 ${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB\n\n✨ *TheYui-MD* — Más que un bot, una leyenda.`,
         },
         { quoted: msg }
       );
