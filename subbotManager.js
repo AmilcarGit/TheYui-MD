@@ -7,6 +7,7 @@ import path from "path";
 
 import { config } from "./config.js";
 import { pasaFiltros, esAdminDeGrupo, botEsAdmin } from "./middlewares.js";
+import { manejarRespuestaInteractiva } from "./interactiveManager.js";
 import { obtenerConfigGrupo } from "./groupSettings.js";
 
 const {
@@ -252,10 +253,15 @@ async function iniciarSocketSubbot(numeroLimpio, sessionFolder, registro, { onPa
         limpiarSubbotDeDisco(numeroLimpio, sessionFolder);
       }
     } else if (connection === "open") {
+      const esPrimeraConexion = !registro.yaNotificoConexion;
       registro.conectado = true;
       registro.intentosReconexion = 0;
       console.log(chalk.greenBright(`\n👑 [Subbot ${numeroLimpio}] Conectado correctamente.\n`));
-      if (onEstado) onEstado(`✅ Subbot @${numeroLimpio} conectado y listo para usarse.`);
+
+      if (esPrimeraConexion) {
+        registro.yaNotificoConexion = true;
+        if (onEstado) onEstado(`✅ Subbot @${numeroLimpio} conectado y listo para usarse.`);
+      }
     }
   });
 
@@ -298,6 +304,12 @@ async function iniciarSocketSubbot(numeroLimpio, sessionFolder, registro, { onPa
 
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
+
+    const contextInteractivo = { chatId, sender, allPlugins: pluginsCompartidos };
+    const fueInteractivo = await manejarRespuestaInteractiva(sock, msg, contextInteractivo).catch(
+      () => false
+    );
+    if (fueInteractivo) return;
 
     const body =
       msg.message.conversation ||
