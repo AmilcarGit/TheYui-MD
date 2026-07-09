@@ -29,6 +29,7 @@ export function obtenerUsuario(numero) {
       banco: 0,
       ultimoDaily: 0,
       ultimoTrabajo: 0,
+      inventario: []
     }
   );
 }
@@ -65,4 +66,40 @@ export function obtenerRanking(limite = 10) {
     }))
     .sort((a, b) => b.total - a.total)
     .slice(0, limite);
+}
+
+export function obtenerInventarioUsuario(numero) {
+  const usuario = obtenerUsuario(numero);
+  return usuario.inventario || [];
+}
+
+export function guardarInventarioUsuario(numero, items) {
+  return guardarUsuario(numero, { inventario: items });
+}
+
+export function agregarItem(numero, itemId) {
+  const items = obtenerInventarioUsuario(numero);
+  items.push(itemId);
+  guardarInventarioUsuario(numero, items);
+  return items;
+}
+
+export function quitarItem(numero, itemId) {
+  let items = obtenerInventarioUsuario(numero);
+  const index = items.indexOf(itemId);
+  if (index !== -1) {
+    items.splice(index, 1);
+    guardarInventarioUsuario(numero, items);
+  }
+  return items;
+}
+
+export function tieneItem(numero, itemId) {
+  const items = obtenerInventarioUsuario(numero);
+  return items.includes(itemId);
+}
+
+export function contarItem(numero, itemId) {
+  const items = obtenerInventarioUsuario(numero);
+  return items.filter(id => id === itemId).length;
 }
