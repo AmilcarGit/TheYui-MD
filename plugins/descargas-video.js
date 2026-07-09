@@ -41,60 +41,30 @@ function esLinkYouTube(url) {
 export default {
   command: ["video", "ytvideo", "mp4"],
   category: "Descargas",
-  description:
-    "Busca o descarga un video de YouTube. Uso: video <nombre> o video <link de YouTube>",
+  description: "Descarga un video de YouTube desde un enlace. Uso: video <link de YouTube>",
   run: async (sock, msg, args, context) => {
     const { chatId } = context;
-    const entrada = args.join(" ").trim();
+    const url = args[0]?.trim();
 
-    if (!entrada) {
+    if (!url) {
       await sock.sendMessage(
         chatId,
-        {
-          text:
-            "❀ Escribe el nombre del video o pega un enlace de YouTube.\n" +
-            "Ejemplo: *video* shape of you\n" +
-            "Ejemplo: *video* https://youtu.be/abc123",
-        },
+        { text: "❀ Envía el enlace del video de YouTube.\nEjemplo: *video* https://youtu.be/abc123" },
+        { quoted: msg }
+      );
+      return;
+    }
+
+    if (!esLinkYouTube(url)) {
+      await sock.sendMessage(
+        chatId,
+        { text: "❌ El enlace no es válido. Solo se aceptan URLs de YouTube." },
         { quoted: msg }
       );
       return;
     }
 
     try {
-      let url = entrada;
-      let tituloBusqueda = entrada;
-
-      if (!esLinkYouTube(entrada)) {
-        await sock.sendMessage(
-          chatId,
-          { text: `🔎 Buscando *${entrada}*...` },
-          { quoted: msg }
-        );
-
-        const searchUrl = `${baseUrl}/api/search/youtube?apiKey=${apiKey}&query=${encodeURIComponent(
-          entrada
-        )}`;
-        const searchRes = await fetch(searchUrl);
-        const searchData = await searchRes.json();
-
-        const resultados =
-          searchData.result || searchData.data || searchData.results || [];
-        const primerVideo = Array.isArray(resultados) ? resultados[0] : resultados;
-
-        if (!primerVideo || !primerVideo.url) {
-          await sock.sendMessage(
-            chatId,
-            { text: "❌ No encontré resultados para esa búsqueda." },
-            { quoted: msg }
-          );
-          return;
-        }
-
-        url = primerVideo.url;
-        tituloBusqueda = primerVideo.title || entrada;
-      }
-
       await sock.sendMessage(
         chatId,
         { text: `╔═══════════════════╗\n║  🚀 THEYUI-MD · DOWNLOADER    ║\n╚═══════════════════╝\n\n${mensajeCargando()}` },
@@ -110,40 +80,17 @@ export default {
       if (!downloadData.status || !info || !info.download_url) {
         await sock.sendMessage(
           chatId,
-          { text: "❌ No pude descargar el video. Verifica que el enlace o la búsqueda sean válidos." },
+          { text: "❌ No pude descargar el video. Verifica que el enlace sea válido." },
           { quoted: msg }
         );
         return;
       }
 
-      const titulo = info.title || tituloBusqueda || "Video sin título";
+      const titulo = info.title || "Video sin título";
       const duracion = formatearDuracion(info.duration);
       const tamaño = bytesToMB(info.size);
       const vistas = info.views ? new Intl.NumberFormat().format(info.views) : "N/A";
       const likes = info.likes ? new Intl.NumberFormat().format(info.likes) : "N/A";
-
-      const archivoRes = await fetch(info.download_url);
-      const tipoContenido = archivoRes.headers.get("content-type") || "";
-
-      if (!archivoRes.ok || !tipoContenido.startsWith("video")) {
-        await sock.sendMessage(
-          chatId,
-          { text: "❌ El servidor no devolvió un video válido, intenta de nuevo en unos segundos." },
-          { quoted: msg }
-        );
-        return;
-      }
-
-      const bufferVideo = Buffer.from(await archivoRes.arrayBuffer());
-
-      if (bufferVideo.length < 10000) {
-        await sock.sendMessage(
-          chatId,
-          { text: "❌ El video descargado llegó incompleto o dañado, intenta con otro." },
-          { quoted: msg }
-        );
-        return;
-      }
 
       if (info.thumbnail) {
         const caption = `╔═══════════════════╗
@@ -174,7 +121,7 @@ export default {
       await sock.sendMessage(
         chatId,
         {
-          video: bufferVideo,
+          video: { url: info.download_url },
           caption: `📹 *${titulo}*\n⏱️ ${duracion} · 📦 ${tamaño}\n\n✨ *TheYui-MD* — Más que un bot, una leyenda.`,
           fileName: `${titulo.slice(0, 60)}.mp4`,
           mimetype: "video/mp4",
