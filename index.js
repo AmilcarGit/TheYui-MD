@@ -8,6 +8,7 @@ import fs from "fs";
 import { config } from "./config.js";
 import { loadPlugins } from "./pluginLoader.js";
 import { pasaFiltros, esAdminDeGrupo, botEsAdmin } from "./middlewares.js";
+import { manejarRespuestaInteractiva } from "./interactiveManager.js";
 import { obtenerConfigGrupo } from "./groupSettings.js";
 import * as subbotManager from "./subbotManager.js";
 import { iniciarLimpiezaAutomatica } from "./limpieza.js";
@@ -306,6 +307,15 @@ async function startBot() {
 
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
+
+    const contextInteractivo = { chatId, sender, allPlugins: plugins };
+    const fueInteractivo = await manejarRespuestaInteractiva(sock, msg, contextInteractivo).catch(
+      (err) => {
+        console.log(chalk.red("❌ Error manejando respuesta interactiva:"), err);
+        return false;
+      }
+    );
+    if (fueInteractivo) return;
 
     const body =
       msg.message.conversation ||
