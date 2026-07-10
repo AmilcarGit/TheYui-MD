@@ -1,17 +1,73 @@
-import sharp from "sharp";
+import fs from "fs";
+import path from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import webp from "node-webpmux";
+
+const execFileAsync = promisify(execFile);
 
 export const PACK_DEFAULT = "𝚃𝙷𝙴𝚈𝚄𝙸🦋";
 export const AUTOR_DEFAULT = "© AmilcarGit 2026";
 
+const CARPETA_TEMP = "./temp";
+
+function asegurarCarpetaTemp() {
+  if (!fs.existsSync(CARPETA_TEMP)) {
+    fs.mkdirSync(CARPETA_TEMP, { recursive: true });
+  }
+}
+
+/**
+ * Convierte un buffer de imagen a .webp de 512x512 (con relleno transparente)
+ * usando ffmpeg por línea de comandos. Requiere que ffmpeg esté instalado
+ * en el sistema (en Termux: pkg install ffmpeg).
+ */
 export async function imagenABufferWebp(buffer) {
-  return await sharp(buffer)
-    .resize(512, 512, {
-      fit: "contain",
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    })
-    .webp({ quality: 80 })
-    .toBuffer();
+  asegurarCarpetaTemp();
+
+  const id = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const inputPath = path.join(CARPETA_TEMP, `${id}-in`);
+  const outputPath = path.join(CARPETA_TEMP, `${id}-out.webp`);
+
+  fs.writeFileSync(inputPath, buffer);
+
+  try {
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-i",
+      inputPath,
+      "-vf",
+      "scale=512:512:force_original_aspect_ratio=decrease,format=rgba,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000",
+      "-vcodec",
+      "libwebp",
+      "-lossless",
+      "0",
+      "-qscale",
+      "75",
+      "-preset",
+      "picture",
+      "-an",
+      "-vsync",
+      "0",
+      outputPath,
+    ]);
+
+    return fs.readFileSync(outputPath);
+  } catch (err) {
+    if (String(err.message || err).includes("ENOENT")) {
+      throw new Error(
+        "ffmpeg no está instalado en el sistema. En Termux corre: pkg install ffmpeg -y"
+      );
+    }
+    throw err;
+  } finally {
+    try {
+      fs.unlinkSync(inputPath);
+    } catch (_) {}
+    try {
+      fs.unlinkSync(outputPath);
+    } catch (_) {}
+  }
 }
 
 export async function agregarMetadataSticker(
