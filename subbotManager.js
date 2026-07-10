@@ -7,8 +7,9 @@ import path from "path";
 
 import { config } from "./config.js";
 import { pasaFiltros, esAdminDeGrupo, botEsAdmin } from "./middlewares.js";
-import { manejarRespuestaInteractiva } from "./interactiveManager.js";
 import { obtenerConfigGrupo } from "./groupSettings.js";
+import { obtenerSesionPack, registrarStickerEnSesion } from "./stickpackSessions.js";
+import { convertirImagenASticker } from "./stickerUtils.js";
 
 const {
   default: makeWASocket,
@@ -16,6 +17,7 @@ const {
   fetchLatestBaileysVersion,
   DisconnectReason,
   Browsers,
+  downloadMediaMessage,
 } = baileysPkg;
 
 const CARPETA_SUBBOTS = "./subbots";
@@ -253,15 +255,10 @@ async function iniciarSocketSubbot(numeroLimpio, sessionFolder, registro, { onPa
         limpiarSubbotDeDisco(numeroLimpio, sessionFolder);
       }
     } else if (connection === "open") {
-      const esPrimeraConexion = !registro.yaNotificoConexion;
       registro.conectado = true;
       registro.intentosReconexion = 0;
       console.log(chalk.greenBright(`\n👑 [Subbot ${numeroLimpio}] Conectado correctamente.\n`));
-
-      if (esPrimeraConexion) {
-        registro.yaNotificoConexion = true;
-        if (onEstado) onEstado(`✅ Subbot @${numeroLimpio} conectado y listo para usarse.`);
-      }
+      if (onEstado) onEstado(`✅ Subbot @${numeroLimpio} conectado y listo para usarse.`);
     }
   });
 
@@ -305,18 +302,32 @@ async function iniciarSocketSubbot(numeroLimpio, sessionFolder, registro, { onPa
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
 
-    const contextInteractivo = { chatId, sender, allPlugins: pluginsCompartidos };
-    const fueInteractivo = await manejarRespuestaInteractiva(sock, msg, contextInteractivo).catch(
-      () => false
-    );
-    if (fueInteractivo) return;
-
     const body =
       msg.message.conversation ||
       msg.message.extendedTextMessage?.text ||
       msg.message.imageMessage?.caption ||
       msg.message.videoMessage?.caption ||
       "";
+
+    const numeroSenderLimpio = sender.split("@")[0].split(":")[0];
+    const sesionPack = obtenerSesionPack(chatId, numeroSenderLimpio);
+
+    if (sesionPack && msg.message.imageMessage) {
+      try {
+        const buffer = await downloadMediaMessage(msg, "buffer", {});
+        const stickerFinal = await convertirImagenASticker(
+          buffer,
+          sesionPack.packName,
+          sesionPack.authorName
+        );
+
+        await sock.sendMessage(chatId, { sticker: stickerFinal }, { quoted: msg });
+        registrarStickerEnSesion(chatId, numeroSenderLimpio);
+      } catch (err) {
+        console.log(chalk.red(`❌ [Subbot ${numeroLimpio}] Error convirtiendo imagen del stickpack:`), err);
+      }
+      return;
+    }
 
     if (!body) return;
 
