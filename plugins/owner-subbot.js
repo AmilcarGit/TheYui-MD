@@ -43,15 +43,20 @@ export default {
       }
 
       const eliminado = await subbotManager.eliminarSubbot(numero);
-      return await sock.sendMessage(
-        chatId,
-        {
-          text: eliminado
-            ? `✅ Subbot ${numero} eliminado.`
-            : `❌ No encontré ningún subbot activo con ese número.`,
-        },
-        { quoted: msg }
-      );
+      try {
+        return await sock.sendMessage(
+          chatId,
+          {
+            text: eliminado
+              ? `✅ Subbot ${numero} eliminado.`
+              : `❌ No encontré ningún subbot activo con ese número.`,
+          },
+          { quoted: msg }
+        );
+      } catch (_) {
+        console.log(`✅ Subbot ${numero} eliminado (no se pudo confirmar por chat porque ese mismo subbot cerró su conexión).`);
+        return;
+      }
     }
 
     // comando === "subbot" o "serbot" → crear/vincular uno nuevo
