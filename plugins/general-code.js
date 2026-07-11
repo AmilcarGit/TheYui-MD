@@ -9,14 +9,6 @@ export default {
     const { chatId, sender } = context;
     const numero = sender.split("@")[0].split(":")[0];
 
-    if (chatId.endsWith("@g.us")) {
-      return await sock.sendMessage(
-        chatId,
-        { text: "💕 Por seguridad, escríbeme *code* en un chat privado (aquí mismo, en directo conmigo), no en el grupo." },
-        { quoted: msg }
-      );
-    }
-
     if (subbotManager.existeSubbot(numero)) {
       return await sock.sendMessage(
         chatId,
