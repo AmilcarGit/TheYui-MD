@@ -1,7 +1,12 @@
 import { config } from "../config.js";
+import { registrarManejador } from "../interactiveManager.js";
+import { descargarPorResultado } from "./descargas-tiktok.js";
 
 const { baseUrl, apiKey } = config.apis.edward;
 const MAX_RESULTADOS = 8;
+const TIEMPO_EXPIRACION_MS = 5 * 60 * 1000;
+
+const busquedasPendientes = new Map();
 
 function formatearDuracion(segundos) {
   if (!segundos && segundos !== 0) return "Desconocida";
@@ -30,12 +35,52 @@ function obtenerMiniatura(video) {
   );
 }
 
+registrarManejador("tiktokselect", async (sock, msg, context, rowId) => {
+  const { chatId, sender } = context;
+  const [, chatKey, indiceStr] = rowId.split(":");
+  const indice = parseInt(indiceStr, 10);
+
+  const pendiente = busquedasPendientes.get(chatKey);
+
+  if (!pendiente || Date.now() > pendiente.expira) {
+    await sock.sendMessage(
+      chatId,
+      { text: "⌛ Esta búsqueda ya expiró, vuelve a usar *tiktoksearch* para buscar de nuevo." },
+      { quoted: msg }
+    );
+    return;
+  }
+
+  if (pendiente.solicitante !== sender) {
+    await sock.sendMessage(
+      chatId,
+      { text: "⚠️ Solo quien pidió la búsqueda puede elegir una opción." },
+      { quoted: msg }
+    );
+    return;
+  }
+
+  const video = pendiente.resultados[indice];
+  if (!video) {
+    await sock.sendMessage(
+      chatId,
+      { text: "❌ Esa opción ya no es válida." },
+      { quoted: msg }
+    );
+    return;
+  }
+
+  busquedasPendientes.delete(chatKey);
+
+  await descargarPorResultado(sock, chatId, msg, video, sender);
+});
+
 export default {
   command: ["tiktoksearch", "ttsearch"],
-  category: "busquedas",
-  description: "Busca videos de TikTok y muestra sus miniaturas. Uso: tiktoksearch <búsqueda>",
+  category: "Descargas",
+  description: "Busca videos de TikTok y descárgalos con un toque (costo: 15 Yui). Uso: tiktoksearch <búsqueda>",
   run: async (sock, msg, args, context) => {
-    const { chatId } = context;
+    const { chatId, sender } = context;
     const query = args.join(" ").trim();
 
     if (!query) {
@@ -73,14 +118,12 @@ export default {
         return;
       }
 
-      if (!global.tiktokCache) global.tiktokCache = new Map();
-      global.tiktokCache.set(chatId, resultados);
-
-      await sock.sendMessage(
-        chatId,
-        { text: `🌸 Encontré *${resultados.length}* videos para *${query}*, aquí los tienes 👇` },
-        { quoted: msg }
-      );
+      const chatKey = `${chatId}_${sender}_${Date.now()}`;
+      busquedasPendientes.set(chatKey, {
+        resultados,
+        solicitante: sender,
+        expira: Date.now() + TIEMPO_EXPIRACION_MS,
+      });
 
       for (let i = 0; i < resultados.length; i++) {
         const video = resultados[i];
@@ -109,12 +152,25 @@ export default {
         }
       }
 
+      const filas = resultados.map((video, i) => ({
+        title: (video.title || `Resultado ${i + 1}`).slice(0, 60),
+        description: `⏱️ ${formatearDuracion(video.duration)} · 👁️ ${formatearVistas(video.views || video.stats?.plays)}`,
+        rowId: `tiktokselect:${chatKey}:${i}`,
+      }));
+
       await sock.sendMessage(
         chatId,
         {
-          text:
-            `💕 Para descargar (costo 15 Yui) escribe: *tiktok <número>*\n` +
-            `🌹 Ejemplo: *tiktok 1*`,
+          text: `Elige el video que quieras descargar 👇\n💵 Costo por descarga: 15 Yui`,
+          footer: "TheYui-MD 💕",
+          title: "🎥 Resultados de TikTok",
+          buttonText: "Ver opciones",
+          sections: [
+            {
+              title: "Resultados",
+              rows: filas,
+            },
+          ],
         },
         { quoted: msg }
       );
