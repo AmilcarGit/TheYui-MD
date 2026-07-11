@@ -136,23 +136,8 @@ async function buscarTikTok(sock, chatId, msg, query) {
 
 export async function descargarPorResultado(sock, chatId, msg, video, sender) {
   try {
-    const url =
-      video.url ||
-      video.video_url ||
-      video.videoUrl ||
-      video.link ||
-      video.permalink ||
-      video.webVideoUrl ||
-      video.share_url ||
-      video.shareUrl ||
-      video.playAddr ||
-      video.play ||
-      video.tiktok_url ||
-      video.original_url ||
-      video.download_url;
-
+    const url = video.url || video.video_url || video.link || video.permalink;
     if (!url) {
-      console.log("⚠️ Resultado de búsqueda de TikTok sin URL reconocida:", JSON.stringify(video, null, 2));
       await sock.sendMessage(
         chatId,
         { text: "❌ El video seleccionado no tiene enlace válido." },
