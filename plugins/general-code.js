@@ -37,11 +37,11 @@ export default {
           await sock.sendMessage(chatId, {
             text:
               `🦋 *Tu código de vinculación*\n\n` +
-              `📱 Número: ${numero}\n` +
-              `🔑 Código: *${code}*\n\n` +
-              `Ve a WhatsApp > Dispositivos vinculados > Vincular con número de teléfono, e ingresa el código.\n\n` +
+              `📱 Número: ${numero}\n\n` +
+              `Ve a WhatsApp > Dispositivos vinculados > Vincular con número de teléfono, e ingresa el código de abajo.\n\n` +
               `⏳ El código expira en unos minutos, si no lo usas a tiempo escribe *code* de nuevo.`,
           });
+          await sock.sendMessage(chatId, { text: code });
         },
         onEstado: async (texto) => {
           try {
