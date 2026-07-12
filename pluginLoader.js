@@ -10,20 +10,26 @@ const pluginsPath = path.join(__dirname, "plugins");
 const ICONOS_CATEGORIA = {
   General: "🦋",
   Info: "🎀",
-  busquedas: "🔭", 
+  busquedas: "🔭",
   Descargas: "🌹",
   Utilidades: "🔧",
   Grupo: "👑",
   Economia: "💰",
   Diversión: "🎮",
   Anime: "💕",
-  Ai: "🦾", 
+  Ai: "🦾",
   Seguridad: "🛡️",
   Owner: "💎",
   Otros: "✨",
 };
 
 const ANCHO = 40;
+
+let ultimoEstadoCarga = { invalidos: [], errores: [] };
+
+export function obtenerEstadoUltimaCarga() {
+  return ultimoEstadoCarga;
+}
 
 function lineaCaja(texto = "", color = (t) => t) {
   const visible = texto.replace(/\x1b\[[0-9;]*m/g, "");
@@ -39,15 +45,6 @@ function bordeInferior() {
   return chalk.magentaBright("╰" + "─".repeat(ANCHO - 2) + "╯");
 }
 
-/**
- * Carga todos los plugins de la carpeta /plugins de forma dinámica.
- * Cada plugin debe exportar por defecto un objeto:
- * {
- *   command: ["hola", "hi"],   // palabras clave que activan el plugin (sin prefijo)
- *   description: "texto",     // opcional, para un futuro menú
- *   run: async (sock, msg, args, context) => { ... }
- * }
- */
 export async function loadPlugins() {
   const plugins = [];
   const invalidos = [];
@@ -91,6 +88,8 @@ export async function loadPlugins() {
   }
 
   process.stdout.write("\n\n");
+
+  ultimoEstadoCarga = { invalidos, errores };
 
   const categorias = {};
   for (const p of plugins) {
