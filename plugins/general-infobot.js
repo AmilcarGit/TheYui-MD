@@ -18,7 +18,7 @@ function formatearMB(bytes) {
 
 export default {
   command: ["infobot", "botinfo", "estado"],
-  category: "Info",
+  category: "General",
   description: "Muestra el estado completo del bot: velocidad, memoria, plugins, subbots y más.",
 
   run: async (sock, msg, args, context) => {
