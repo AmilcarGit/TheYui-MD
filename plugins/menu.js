@@ -83,7 +83,7 @@ export default {
     texto += `│ 💵 Yui  │ ⏱️ ${uptime}\n`;
     texto += `│ ⚡ ${totalComandos} cmd  │ 📦 ${allPlugins.length} plugins\n`;
     texto += `│ 🕐 ${fecha}\n`;
-    texto += `│ 🌐 Powerby: 𝐖𝐇𝐀𝐓𝐒𝐀𝐏𝐏 𝐋𝐋𝐂. 
+    texto += `│ 🌐 Powerby: 𝐖𝐇𝐀𝐓𝐒𝐀𝐏𝐏 𝐋𝐋𝐂`; 
     texto += `╰────────────────────╯\n\n`;
 
     texto += `🌹 *MIS COMANDOS* 🦋`;
