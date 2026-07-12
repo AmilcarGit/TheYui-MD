@@ -77,7 +77,7 @@ export default {
     texto += `  _Tu waifu inteligente_ 💕\n`;
     texto += `🌸┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈🌸\n\n`;
 
-    texto += `╭─٭🎀 *INFO BOT* 🎀\n`;
+    texto += `╭─🎀 *INFO٭BOT* 🎀\n`;
     texto += `│ 👤 @${numero}\n`;
     texto += `│ 💎 ${config.creator}\n`;
     texto += `│ 💵 Yui  │ ⏱️ ${uptime}\n`;
