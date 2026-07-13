@@ -1,7 +1,10 @@
 import { config } from "./config.js";
 
 export function esOwner(numero) {
-  return numero === config.ownerNumber;
+  const numeroLimpio = String(numero || "").replace(/\D/g, "");
+  return (config.ownerNumbers || []).some(
+    (n) => String(n).replace(/\D/g, "") === numeroLimpio
+  );
 }
 
 /**
