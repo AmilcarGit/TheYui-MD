@@ -7,7 +7,7 @@ import fs from "fs";
 
 import { config } from "./config.js";
 import { loadPlugins } from "./pluginLoader.js";
-import { pasaFiltros, esAdminDeGrupo, botEsAdmin } from "./middlewares.js";
+import { pasaFiltros, esAdminDeGrupo, botEsAdmin, esOwner } from "./middlewares.js";
 import { manejarRespuestaInteractiva } from "./interactiveManager.js";
 import { obtenerConfigGrupo } from "./groupSettings.js";
 import * as subbotManager from "./subbotManager.js";
@@ -354,7 +354,7 @@ async function startBot() {
 
       if (configGrupo.antilink) {
         const numeroBase = numeroLimpio.split(":")[0];
-        const esDueño = numeroBase === config.ownerNumber;
+        const esDueño = esOwner(numeroBase);
         let esAdmin = false;
 
         if (!esDueño) {
