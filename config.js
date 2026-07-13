@@ -1,7 +1,7 @@
 export const config = {
   botName: "TheYui-MD",
   creator: "AmilcarGit",
-  ownerNumbers: ["51910227479"],
+  ownerNumbers: ["51910227479", "51925679896"],
   sessionFolder: "./session",
   pluginsFolder: "./plugins",
 
