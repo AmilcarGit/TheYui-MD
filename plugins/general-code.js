@@ -1,4 +1,5 @@
 import * as subbotManager from "../subbotManager.js";
+import { resolverNumeroReal } from "../middlewares.js";
 
 export default {
   command: ["code", "codigo"],
@@ -7,7 +8,26 @@ export default {
 
   run: async (sock, msg, args, context) => {
     const { chatId, sender } = context;
-    const numero = sender.split("@")[0].split(":")[0];
+
+    const numeroManual = args[0]?.replace(/\D/g, "");
+    let numero = numeroManual || (await resolverNumeroReal(sock, sender));
+
+    const senderEsLid = sender.endsWith("@lid");
+    const idLidCrudo = sender.split("@")[0].split(":")[0].replace(/\D/g, "");
+    const noSePudoResolver = senderEsLid && numero === idLidCrudo && !numeroManual;
+
+    if (noSePudoResolver) {
+      return await sock.sendMessage(
+        chatId,
+        {
+          text:
+            "⚠️ No pude detectar tu número real automáticamente.\n\n" +
+            "Escribe tu número manualmente así: *code <tu número>*\n" +
+            "Ejemplo: *code 51910227479* (con código de país, sin + ni espacios)",
+        },
+        { quoted: msg }
+      );
+    }
 
     if (subbotManager.existeSubbot(numero)) {
       return await sock.sendMessage(
