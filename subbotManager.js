@@ -1,101 +1,169 @@
-import baileysPkg from "@whiskeysockets/baileys";
-import { Boom } from "@hapi/boom";
-import readline from "readline";
-import pino from "pino";
-import chalk from "chalk";
-import fs from "fs";
-
-import { config } from "./config.js";
-import { loadPlugins } from "./pluginLoader.js";
-import { pasaFiltros, esAdminDeGrupo, botEsAdmin, esOwner } from "./middlewares.js";
-import { evaluarMensaje } from "./spamGuard.js";
-import { manejarRespuestaInteractiva } from "./interactiveManager.js";
-import { obtenerConfigGrupo } from "./groupSettings.js";
-import * as subbotManager from "./subbotManager.js";
-import { iniciarLimpiezaAutomatica } from "./limpieza.js";
-
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
 const {
   default: makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
   Browsers,
-} = baileysPkg;
+} = require("@whiskeysockets/baileys");
+import { Boom } from "@hapi/boom";
+import pino from "pino";
+import chalk from "chalk";
+import fs from "fs";
+import path from "path";
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
+import { config } from "./config.js";
+import { pasaFiltros, esAdminDeGrupo, botEsAdmin, esOwner } from "./middlewares.js";
+import { evaluarMensaje } from "./spamGuard.js";
+import { manejarRespuestaInteractiva } from "./interactiveManager.js";
+import { obtenerConfigGrupo } from "./groupSettings.js";
 
-const question = (text) =>
-  new Promise((resolve) => rl.question(text, resolve));
+const CARPETA_SUBBOTS = "./subbots";
+const MAX_INTENTOS_RECONEXION = 2;
 
-process.on("uncaughtException", (err) => {
-  console.log(chalk.red("❌ Error no controlado (uncaughtException):"), err);
-});
+let pluginsCompartidos = [];
+export function setPlugins(plugins) {
+  pluginsCompartidos = plugins;
+}
 
-process.on("unhandledRejection", (err) => {
-  console.log(chalk.red("❌ Promesa rechazada sin manejar (unhandledRejection):"), err);
-});
+const subbotsActivos = new Map();
 
-let plugins = [];
-const groupMetadataCache = new Map();
+function limpiarNumero(numero) {
+  return String(numero || "").replace(/\D/g, "");
+}
 
-async function enviarConReintento(sock, chatId, content, opciones = {}, intentos = 2) {
-  for (let i = 0; i <= intentos; i++) {
+function limpiarSubbotDeDisco(numeroLimpio, sessionFolder) {
+  subbotsActivos.delete(numeroLimpio);
+
+  try {
+    fs.rmSync(sessionFolder, { recursive: true, force: true });
+    console.log(chalk.gray(`🗑️  [Subbot ${numeroLimpio}] Carpeta de sesión eliminada.`));
+  } catch (err) {
+    console.log(chalk.red(`❌ [Subbot ${numeroLimpio}] No se pudo borrar la carpeta de sesión:`), err);
+  }
+}
+
+export function listarSubbots() {
+  return Array.from(subbotsActivos.values()).map((s) => ({
+    numero: s.numero,
+    conectado: s.conectado,
+  }));
+}
+
+export function existeSubbot(numero) {
+  return subbotsActivos.has(limpiarNumero(numero));
+}
+
+export async function eliminarSubbot(numero) {
+  const numeroLimpio = limpiarNumero(numero);
+  const info = subbotsActivos.get(numeroLimpio);
+  if (!info) return false;
+
+  try {
+    await info.sock?.logout?.();
+  } catch (_) {}
+  try {
+    info.sock?.end?.(undefined);
+  } catch (_) {}
+
+  subbotsActivos.delete(numeroLimpio);
+
+  try {
+    fs.rmSync(info.sessionFolder, { recursive: true, force: true });
+  } catch (_) {}
+
+  return true;
+}
+
+/**
+ * Recorre la carpeta ./subbots y reconecta automáticamente cualquier
+ * subbot que ya tenga una sesión válida guardada (creds.json), sin pedir
+ * código de vinculación de nuevo. Pensado para llamarse al arrancar el
+ * bot principal, así los subbots no quedan "dormidos" tras un reinicio.
+ */
+export async function reconectarSubbotsGuardados(onEstado) {
+  if (!fs.existsSync(CARPETA_SUBBOTS)) return;
+
+  const carpetas = fs
+    .readdirSync(CARPETA_SUBBOTS, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name);
+
+  if (carpetas.length === 0) return;
+
+  console.log(
+    chalk.cyan(`🦋 Revisando subbots guardados (${carpetas.length} encontrado(s))...`)
+  );
+
+  for (const numero of carpetas) {
+    const sessionFolder = path.join(CARPETA_SUBBOTS, numero);
+    const credsPath = path.join(sessionFolder, "creds.json");
+
+    if (!fs.existsSync(credsPath)) {
+      continue;
+    }
+
+    if (subbotsActivos.has(numero)) continue;
+
+    const registro = { sock: null, sessionFolder, conectado: false, numero };
+    subbotsActivos.set(numero, registro);
+
+    console.log(chalk.cyan(`🔄 Reconectando subbot guardado: ${numero}...`));
+
     try {
-      return await sock.sendMessage(chatId, content, opciones);
+      await iniciarSocketSubbot(numero, sessionFolder, registro, {
+        onPairingCode: () => {},
+        onEstado,
+      });
     } catch (err) {
-      if (i === intentos) throw err;
-      await new Promise((r) => setTimeout(r, 1500));
+      console.log(chalk.red(`❌ No se pudo reconectar el subbot ${numero}:`), err);
+      subbotsActivos.delete(numero);
     }
   }
 }
 
-async function startBot() {
-  console.log(
-    chalk.magentaBright(`
-🌸━━━━━━━━━━━━━━━━━━━━━━━━━━━🌸
-        🦋 ${config.botName.toUpperCase()} 🦋
-     Creado por ${config.creator} · v${process.env.npm_package_version || "1.0.0"}
-🌸━━━━━━━━━━━━━━━━━━━━━━━━━━━🌸
-`)
-  );
+/**
+ * Crea (o reconecta) un subbot para el número indicado.
+ * onPairingCode(code) se llama cuando WhatsApp entrega el código de 8 dígitos.
+ * onEstado(texto) se llama con actualizaciones de estado legibles para el usuario.
+ */
+export async function crearSubbot(numeroDestino, { onPairingCode, onEstado } = {}) {
+  const numeroLimpio = limpiarNumero(numeroDestino);
 
-  plugins = await loadPlugins();
-  subbotManager.setPlugins(plugins);
+  if (!numeroLimpio || numeroLimpio.length < 8) {
+    throw new Error("Número inválido. Escríbelo con código de país, sin + ni espacios.");
+  }
 
-  subbotManager
-    .reconectarSubbotsGuardados((texto) => {
-      console.log(chalk.cyan(texto));
-    })
-    .catch((err) => {
-      console.log(chalk.red("❌ Error reconectando subbots guardados:"), err);
-    });
+  if (subbotsActivos.has(numeroLimpio)) {
+    throw new Error("Ya hay un subbot activo o conectándose con ese número.");
+  }
 
-  iniciarLimpiezaAutomatica(30 * 60 * 1000, ({ archivosEliminados, bytesLiberados }) => {
-    if (archivosEliminados > 0) {
-      console.log(
-        chalk.magenta(
-          `🧹 Limpieza automática: ${archivosEliminados} archivo(s) temporal(es) eliminado(s).`
-        )
-      );
-    }
-  });
+  const sessionFolder = path.join(CARPETA_SUBBOTS, numeroLimpio);
+  if (!fs.existsSync(sessionFolder)) {
+    fs.mkdirSync(sessionFolder, { recursive: true });
+  }
 
-  const { state, saveCreds } = await useMultiFileAuthState(
-    config.sessionFolder
-  );
+  const registro = { sock: null, sessionFolder, conectado: false, numero: numeroLimpio };
+  subbotsActivos.set(numeroLimpio, registro);
+
+  await iniciarSocketSubbot(numeroLimpio, sessionFolder, registro, { onPairingCode, onEstado });
+
+  return registro;
+}
+
+async function iniciarSocketSubbot(numeroLimpio, sessionFolder, registro, { onPairingCode, onEstado }) {
+  const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
   const { version } = await fetchLatestBaileysVersion();
 
-  const usePairingCode = !fs.existsSync(
-    `${config.sessionFolder}/creds.json`
-  );
+  const usePairingCode = !fs.existsSync(`${sessionFolder}/creds.json`);
+
+  const groupMetadataCache = new Map();
 
   const sock = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: !usePairingCode ? true : false,
+    printQRInTerminal: false,
     browser: Browsers.ubuntu("Chrome"),
     logger: pino({ level: "silent" }),
     syncFullHistory: false,
@@ -105,22 +173,14 @@ async function startBot() {
     cachedGroupMetadata: async (jid) => groupMetadataCache.get(jid),
   });
 
+  registro.sock = sock;
+
   async function actualizarCacheGrupo(chatId) {
     try {
       const metadata = await sock.groupMetadata(chatId);
       groupMetadataCache.set(chatId, metadata);
       return metadata;
-    } catch (err) {
-      const statusCode = err?.output?.statusCode;
-      if (statusCode === 403) {
-        console.log(
-          chalk.yellow(
-            `⚠️  No se pudo leer info del grupo ${chatId} (403, probablemente el bot ya no está ahí).`
-          )
-        );
-      } else {
-        console.log(chalk.red("❌ Error actualizando caché del grupo:"), err);
-      }
+    } catch (_) {
       return null;
     }
   }
@@ -129,118 +189,21 @@ async function startBot() {
     if (event?.id) await actualizarCacheGrupo(event.id);
   });
 
-  sock.contacts = {};
-
-  sock.ev.on("contacts.upsert", (contactos) => {
-    for (const contacto of contactos) {
-      sock.contacts[contacto.id] = contacto;
-    }
-  });
-
-  sock.ev.on("contacts.update", (actualizaciones) => {
-    for (const act of actualizaciones) {
-      if (sock.contacts[act.id]) {
-        Object.assign(sock.contacts[act.id], act);
-      } else {
-        sock.contacts[act.id] = act;
-      }
-    }
-  });
-
-  const enviarOriginal = sock.sendMessage.bind(sock);
-  sock.sendMessage = (jid, content, options = {}) => {
-    const newsletterContext = {
-      forwardingScore: 999,
-      isForwarded: true,
-      forwardedNewsletterMessageInfo: {
-        newsletterJid: config.newsletterJid,
-        newsletterName: config.botName,
-        serverMessageId: 143,
-      },
-    };
-
-    const contentConContexto = {
-      ...content,
-      contextInfo: {
-        ...(content?.contextInfo || {}),
-        ...newsletterContext,
-      },
-    };
-
-    return enviarOriginal(jid, contentConContexto, options);
-  };
-
   if (usePairingCode) {
-    const metodo = await question(
-      chalk.yellow(
-        "\n¿Cómo quieres vincular a TheYui-MD?\n1) Código de 8 dígitos\n2) Código QR\nElige 1 o 2: "
-      )
-    );
-
-    if (metodo.trim() === "1") {
-      const numero = await question(
-        chalk.yellow(
-          "\nEscribe tu número de WhatsApp con código de país (sin + ni espacios). Ej: 51910227479\nNúmero: "
-        )
-      );
-
-      const esperarSocketListo = async (maxEsperaMs = 20000) => {
-        const inicio = Date.now();
-        while (Date.now() - inicio < maxEsperaMs) {
-          if (sock.ws?.readyState === 1) return true;
-          await new Promise((r) => setTimeout(r, 300));
-        }
-        return false;
-      };
-
-      const pedirCodigoConReintentos = async (intentosRestantes = 3) => {
-        const listo = await esperarSocketListo();
-
-        if (!listo) {
-          console.log(
-            chalk.red(
-              "❌ El socket no llegó a estar listo a tiempo, no se pudo pedir el código."
-            )
-          );
-          return;
-        }
-
-        try {
-          const code = await sock.requestPairingCode(numero.trim());
-          console.log(
-            chalk.greenBright(`\n✅ Tu código de vinculación es: `) +
-              chalk.bold.white(code)
-          );
-          console.log(
-            chalk.gray(
-              "Ve a WhatsApp > Dispositivos vinculados > Vincular con número de teléfono, e ingresa el código.\n"
-            )
-          );
-        } catch (err) {
-          const statusCode = err?.output?.statusCode;
-
-          if (statusCode === 428 && intentosRestantes > 0) {
-            console.log(
-              chalk.yellow(
-                `⚠️  WhatsApp respondió 428 (conexión aún no lista), reintentando en 3s... (${intentosRestantes} intento(s) restante(s))`
-              )
-            );
-            await new Promise((r) => setTimeout(r, 3000));
-            return pedirCodigoConReintentos(intentosRestantes - 1);
-          }
-
-          console.log(chalk.red("❌ Error solicitando el código de vinculación:"), err);
-        }
-      };
-
-      pedirCodigoConReintentos();
-    } else {
-      console.log(
-        chalk.yellow(
-          "\nEscanea el código QR que aparecerá arriba con WhatsApp > Dispositivos vinculados.\n"
-        )
-      );
-    }
+    setTimeout(async () => {
+      try {
+        const code = await sock.requestPairingCode(numeroLimpio);
+        console.log(
+          chalk.greenBright(`\n✅ [Subbot ${numeroLimpio}] Código de vinculación: `) +
+            chalk.bold.white(code)
+        );
+        if (onPairingCode) onPairingCode(code);
+      } catch (err) {
+        console.log(chalk.red(`❌ [Subbot ${numeroLimpio}] Error pidiendo el código:`), err);
+        if (onEstado) onEstado(`❌ No se pudo generar el código de vinculación. Intenta de nuevo.`);
+        subbotsActivos.delete(numeroLimpio);
+      }
+    }, 3000);
   }
 
   sock.ev.on("connection.update", (update) => {
@@ -250,42 +213,56 @@ async function startBot() {
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
-      console.log(
-        chalk.red(
-          `⚠️  Conexión cerrada. ${
-            shouldReconnect ? "Reconectando..." : "Sesión cerrada, borra la carpeta 'session' para reiniciar."
-          }`
-        )
-      );
+      registro.conectado = false;
 
       if (shouldReconnect) {
-        startBot().catch((err) => {
-          console.log(chalk.red("❌ Error al reconectar, reintentando en 5s:"), err);
-          setTimeout(() => startBot().catch(() => {}), 5000);
-        });
-      }
-    } else if (connection === "open") {
-      console.log(
-        chalk.greenBright(
-          `\n✅ ${config.botName} conectada y lista para trabajar 💕\n`
-        )
-      );
+        registro.intentosReconexion = (registro.intentosReconexion || 0) + 1;
 
-      (async () => {
-        try {
-          const todosLosGrupos = await sock.groupFetchAllParticipating();
-          for (const chatId of Object.keys(todosLosGrupos)) {
-            groupMetadataCache.set(chatId, todosLosGrupos[chatId]);
-          }
+        if (registro.intentosReconexion > MAX_INTENTOS_RECONEXION) {
           console.log(
-            chalk.magenta(
-              `📦 ${Object.keys(todosLosGrupos).length} grupo(s) en caché.`
+            chalk.red(
+              `❌ [Subbot ${numeroLimpio}] Se agotaron los ${MAX_INTENTOS_RECONEXION} intentos de reconexión. Eliminando sesión.`
             )
           );
-        } catch (err) {
-          console.log(chalk.red("❌ Error precargando grupos:"), err);
+          if (onEstado) {
+            onEstado(
+              `❌ El subbot @${numeroLimpio} no pudo reconectarse tras ${MAX_INTENTOS_RECONEXION} intentos. Se eliminó su sesión, vincúlalo de nuevo con *subbot ${numeroLimpio}*.`
+            );
+          }
+          limpiarSubbotDeDisco(numeroLimpio, sessionFolder);
+          return;
         }
-      })();
+
+        console.log(
+          chalk.yellow(
+            `⚠️  [Subbot ${numeroLimpio}] Conexión cerrada, reconectando... (intento ${registro.intentosReconexion}/${MAX_INTENTOS_RECONEXION})`
+          )
+        );
+        iniciarSocketSubbot(numeroLimpio, sessionFolder, registro, { onPairingCode, onEstado }).catch(
+          (err) => {
+            console.log(chalk.red(`❌ [Subbot ${numeroLimpio}] Error al reconectar:`), err);
+            limpiarSubbotDeDisco(numeroLimpio, sessionFolder);
+          }
+        );
+      } else {
+        console.log(chalk.red(`⚠️  [Subbot ${numeroLimpio}] Sesión cerrada (logout).`));
+        if (onEstado) {
+          onEstado(
+            `⚠️ El subbot @${numeroLimpio} cerró sesión desde el teléfono. Se eliminó su sesión guardada.`
+          );
+        }
+        limpiarSubbotDeDisco(numeroLimpio, sessionFolder);
+      }
+    } else if (connection === "open") {
+      const esPrimeraConexion = !registro.yaNotificoConexion;
+      registro.conectado = true;
+      registro.intentosReconexion = 0;
+      console.log(chalk.greenBright(`\n👑 [Subbot ${numeroLimpio}] Conectado correctamente.\n`));
+
+      if (esPrimeraConexion) {
+        registro.yaNotificoConexion = true;
+        if (onEstado) onEstado(`✅ Subbot @${numeroLimpio} conectado y listo para usarse.`);
+      }
     }
   });
 
@@ -296,7 +273,6 @@ async function startBot() {
 
     try {
       const configGrupo = obtenerConfigGrupo(chatId);
-
       const metadata = await actualizarCacheGrupo(chatId);
       if (!metadata) return;
       if (!configGrupo.welcome) return;
@@ -314,40 +290,30 @@ async function startBot() {
           fotoPerfil = "https://i.imgur.com/1Q9ZQ2M.png";
         }
 
-        try {
-          if (action === "add") {
-            const texto =
-              `⭐ ¡Bienvenido/a @${numero} a *${nombreGrupo}*!\n` +
-              `Esperamos que la pases increíble por aquí. ❀\n\n` +
-              `👥 Ahora somos *${totalMiembros}* miembros.`;
+        if (action === "add") {
+          const texto =
+            `⭐ ¡Bienvenido/a @${numero} a *${nombreGrupo}*!\n` +
+            `Esperamos que la pases increíble por aquí. ❀\n\n` +
+            `👥 Ahora somos *${totalMiembros}* miembros.`;
 
-            await enviarConReintento(sock, chatId, {
-              image: { url: fotoPerfil },
-              caption: texto,
-              mentions: [participante],
-            });
-          } else if (action === "remove") {
-            const texto =
-              `👋 @${numero} salió de *${nombreGrupo}*. ¡Hasta pronto!\n\n` +
-              `👥 Quedamos *${totalMiembros}* miembros.`;
+          await sock.sendMessage(chatId, {
+            image: { url: fotoPerfil },
+            caption: texto,
+            mentions: [participante],
+          });
+        } else if (action === "remove") {
+          const texto =
+            `👋 @${numero} salió de *${nombreGrupo}*. ¡Hasta pronto!\n\n` +
+            `👥 Quedamos *${totalMiembros}* miembros.`;
 
-            await enviarConReintento(sock, chatId, {
-              image: { url: fotoPerfil },
-              caption: texto,
-              mentions: [participante],
-            });
-          }
-        } catch (errEnvio) {
-          console.log(
-            chalk.yellow(
-              `⚠️  No se pudo enviar bienvenida/despedida en ${chatId} (posible internet lento).`
-            )
-          );
+          await sock.sendMessage(chatId, {
+            image: { url: fotoPerfil },
+            caption: texto,
+            mentions: [participante],
+          });
         }
       }
-    } catch (err) {
-      console.log(chalk.red("❌ Error en bienvenida/despedida:"), err);
-    }
+    } catch (_) {}
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
@@ -359,12 +325,9 @@ async function startBot() {
     const chatId = msg.key.remoteJid;
     const sender = msg.key.participant || msg.key.remoteJid;
 
-    const contextInteractivo = { chatId, sender, allPlugins: plugins };
+    const contextInteractivo = { chatId, sender, allPlugins: pluginsCompartidos };
     const fueInteractivo = await manejarRespuestaInteractiva(sock, msg, contextInteractivo).catch(
-      (err) => {
-        console.log(chalk.red("❌ Error manejando respuesta interactiva:"), err);
-        return false;
-      }
+      () => false
     );
     if (fueInteractivo) return;
 
@@ -377,9 +340,6 @@ async function startBot() {
 
     if (!body) return;
 
-    const numeroLimpio = sender.split("@")[0];
-    console.log(chalk.blueBright(`📩 ${numeroLimpio}: `) + body);
-
     const esGrupo = chatId.endsWith("@g.us");
     const contieneLink = /chat\.whatsapp\.com\/[a-zA-Z0-9]+/i.test(body);
 
@@ -387,8 +347,8 @@ async function startBot() {
       const configGrupo = obtenerConfigGrupo(chatId);
 
       if (configGrupo.antilink) {
-        const numeroBase = numeroLimpio.split(":")[0];
-        const esDueño = esOwner(numeroBase);
+        const numeroLimpioSender = sender.split("@")[0].split(":")[0];
+        const esDueño = esOwner(numeroLimpioSender);
         let esAdmin = false;
 
         if (!esDueño) {
@@ -412,21 +372,20 @@ async function startBot() {
           if (botAdmin) {
             try {
               await sock.groupParticipantsUpdate(chatId, [sender], "remove");
-              await enviarConReintento(sock, chatId, {
-                text: `🚫 @${numeroBase} fue *expulsado* por enviar enlaces no permitidos.`,
+              await sock.sendMessage(chatId, {
+                text: `🚫 @${numeroLimpioSender} fue *expulsado* por enviar enlaces no permitidos.`,
                 mentions: [sender],
               });
             } catch (err) {
-              console.log(chalk.red(`❌ No se pudo expulsar a ${numeroBase} por antilink:`), err);
-              await enviarConReintento(sock, chatId, {
-                text: `🚫 @${numeroBase} no se permiten enlaces en este grupo (no pude expulsarlo).`,
+              await sock.sendMessage(chatId, {
+                text: `🚫 @${numeroLimpioSender} no se permiten enlaces en este grupo (no pude expulsarlo).`,
                 mentions: [sender],
               });
             }
           } else {
-            await enviarConReintento(sock, chatId, {
+            await sock.sendMessage(chatId, {
               text:
-                `🚫 @${numeroBase} no se permiten enlaces en este grupo.\n` +
+                `🚫 @${numeroLimpioSender} no se permiten enlaces en este grupo.\n` +
                 `⚠️ Hazme *administrador* para que pueda expulsar automáticamente a quien los envíe.`,
               mentions: [sender],
             });
@@ -439,8 +398,8 @@ async function startBot() {
 
     if (esGrupo && (obtenerConfigGrupo(chatId).antiflood || obtenerConfigGrupo(chatId).antispam)) {
       const configGrupo = obtenerConfigGrupo(chatId);
-      const numeroBase = numeroLimpio.split(":")[0];
-      const esDueño = esOwner(numeroBase);
+      const numeroLimpioSender = sender.split("@")[0].split(":")[0];
+      const esDueño = esOwner(numeroLimpioSender);
       let esAdmin = false;
 
       if (!esDueño) {
@@ -471,25 +430,25 @@ async function startBot() {
             if (botAdmin) {
               try {
                 await sock.groupParticipantsUpdate(chatId, [sender], "remove");
-                await enviarConReintento(sock, chatId, {
-                  text: `🚫 @${numeroBase} fue *expulsado* por ${motivo}.`,
+                await sock.sendMessage(chatId, {
+                  text: `🚫 @${numeroLimpioSender} fue *expulsado* por ${motivo}.`,
                   mentions: [sender],
                 });
               } catch (err) {
-                await enviarConReintento(sock, chatId, {
-                  text: `⚠️ @${numeroBase} está ${motivo} (no pude expulsarlo).`,
+                await sock.sendMessage(chatId, {
+                  text: `⚠️ @${numeroLimpioSender} está ${motivo} (no pude expulsarlo).`,
                   mentions: [sender],
                 });
               }
             } else {
-              await enviarConReintento(sock, chatId, {
-                text: `⚠️ @${numeroBase} está ${motivo}. Hazme *administrador* para poder expulsar automáticamente.`,
+              await sock.sendMessage(chatId, {
+                text: `⚠️ @${numeroLimpioSender} está ${motivo}. Hazme *administrador* para poder expulsar automáticamente.`,
                 mentions: [sender],
               });
             }
           } else {
-            await enviarConReintento(sock, chatId, {
-              text: `⚠️ @${numeroBase}, deja de ${motivo} o serás expulsado.`,
+            await sock.sendMessage(chatId, {
+              text: `⚠️ @${numeroLimpioSender}, deja de ${motivo} o serás expulsado.`,
               mentions: [sender],
             });
           }
@@ -503,17 +462,17 @@ async function startBot() {
     const primeraPalabra = textoLower.split(/\s+/)[0];
     const args = body.trim().split(/\s+/).slice(1);
 
-    const context = { sender, chatId, body, allPlugins: plugins };
+    const context = { sender, chatId, body, allPlugins: pluginsCompartidos };
 
     const configGrupoActual = esGrupo ? obtenerConfigGrupo(chatId) : null;
-    const botApagadoEnGrupo =
-      esGrupo && configGrupoActual && configGrupoActual.activo === false;
+    const botApagadoEnGrupo = esGrupo && configGrupoActual && configGrupoActual.activo === false;
+    const soloBotPrincipalActivo = esGrupo && configGrupoActual && configGrupoActual.soloPrincipal === true;
 
-    for (const plugin of plugins) {
+    for (const plugin of pluginsCompartidos) {
       if (plugin.command.includes(primeraPalabra)) {
-        if (botApagadoEnGrupo && !plugin.bypassApagado) {
-          break;
-        }
+        if (plugin.soloBotPrincipal) continue;
+        if (soloBotPrincipalActivo) break;
+        if (botApagadoEnGrupo && !plugin.bypassApagado) break;
 
         try {
           const puedeContinuar = await pasaFiltros(sock, msg, plugin, context);
@@ -521,17 +480,10 @@ async function startBot() {
 
           await plugin.run(sock, msg, args, context);
         } catch (err) {
-          console.log(
-            chalk.red(`❌ Error ejecutando el plugin ${plugin.fileName}:`),
-            err
-          );
+          console.log(chalk.red(`❌ [Subbot ${numeroLimpio}] Error en plugin:`), err);
         }
         break;
       }
     }
   });
 }
-
-startBot().catch((err) => {
-  console.log(chalk.red("❌ Error al iniciar el bot:"), err);
-});
