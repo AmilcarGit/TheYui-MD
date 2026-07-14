@@ -1,3 +1,5 @@
+//INDEX OFFICIAL DE THEYUI-MD
+
 import baileysPkg from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import readline from "readline";
@@ -184,32 +186,13 @@ async function startBot() {
         )
       );
 
-      const esperarSocketListo = async (maxEsperaMs = 20000) => {
-        const inicio = Date.now();
-        while (Date.now() - inicio < maxEsperaMs) {
-          if (sock.ws?.readyState === 1) return true;
-          await new Promise((r) => setTimeout(r, 300));
-        }
-        return false;
-      };
-
-      const pedirCodigoConReintentos = async (intentosRestantes = 3) => {
-        const listo = await esperarSocketListo();
-
-        if (!listo) {
-          console.log(
-            chalk.red(
-              "❌ El socket no llegó a estar listo a tiempo, no se pudo pedir el código."
-            )
-          );
-          return;
-        }
-
+      setTimeout(async () => {
         try {
           const code = await sock.requestPairingCode(numero.trim());
           console.log(
-            chalk.greenBright(`\n✅ Tu código de vinculación es: `) +
-              chalk.bold.white(code)
+            chalk.greenBright(
+              `\n✅ Tu código de vinculación es: `
+            ) + chalk.bold.white(code)
           );
           console.log(
             chalk.gray(
@@ -217,23 +200,9 @@ async function startBot() {
             )
           );
         } catch (err) {
-          const statusCode = err?.output?.statusCode;
-
-          if (statusCode === 428 && intentosRestantes > 0) {
-            console.log(
-              chalk.yellow(
-                `⚠️  WhatsApp respondió 428 (conexión aún no lista), reintentando en 3s... (${intentosRestantes} intento(s) restante(s))`
-              )
-            );
-            await new Promise((r) => setTimeout(r, 3000));
-            return pedirCodigoConReintentos(intentosRestantes - 1);
-          }
-
           console.log(chalk.red("❌ Error solicitando el código de vinculación:"), err);
         }
-      };
-
-      pedirCodigoConReintentos();
+      }, 3000);
     } else {
       console.log(
         chalk.yellow(
