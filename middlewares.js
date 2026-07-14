@@ -4,7 +4,7 @@ export function esOwner(numero) {
   return config.ownerNumbers.includes(numero);
 }
 
-export async function resolverNumeroReal(sock, sender) {
+export async function resolverNumeroReal(sock, sender, msg = null) {
   const crudo = String(sender || "");
   const limpioDirecto = crudo.split("@")[0].split(":")[0].replace(/\D/g, "");
 
@@ -12,14 +12,44 @@ export async function resolverNumeroReal(sock, sender) {
     return limpioDirecto;
   }
 
+  const alternativaEnMsg =
+    msg?.key?.participantPn ||
+    msg?.key?.senderPn ||
+    msg?.key?.remoteJidPn ||
+    msg?.verifiedBizName;
+
+  if (alternativaEnMsg && !String(alternativaEnMsg).endsWith("@lid")) {
+    const numeroDelMsg = String(alternativaEnMsg).split("@")[0].split(":")[0].replace(/\D/g, "");
+    if (numeroDelMsg) return numeroDelMsg;
+  }
+
   try {
     const contactos = sock?.contacts || {};
-    const contacto = contactos[crudo];
-    const candidato = contacto?.id || contacto?.jid || contacto?.phoneNumber || contacto?.pn;
 
-    if (candidato && !String(candidato).endsWith("@lid")) {
-      const numeroReal = String(candidato).split("@")[0].split(":")[0].replace(/\D/g, "");
+    const directo = contactos[crudo];
+    const candidatoDirecto = directo?.id || directo?.jid || directo?.phoneNumber || directo?.pn;
+    if (candidatoDirecto && !String(candidatoDirecto).endsWith("@lid")) {
+      const numeroReal = String(candidatoDirecto).split("@")[0].split(":")[0].replace(/\D/g, "");
       if (numeroReal) return numeroReal;
+    }
+
+    for (const contacto of Object.values(contactos)) {
+      const camposLid = [contacto?.lid, contacto?.id, contacto?.jid]
+        .filter(Boolean)
+        .map((v) => String(v));
+
+      const coincideLid = camposLid.some((v) => v === crudo || v.split("@")[0] === limpioDirecto);
+      if (!coincideLid) continue;
+
+      const candidatos = [contacto?.id, contacto?.jid, contacto?.phoneNumber, contacto?.pn]
+        .filter(Boolean)
+        .map((v) => String(v))
+        .filter((v) => !v.endsWith("@lid"));
+
+      if (candidatos[0]) {
+        const numeroReal = candidatos[0].split("@")[0].split(":")[0].replace(/\D/g, "");
+        if (numeroReal) return numeroReal;
+      }
     }
   } catch (_) {}
 
@@ -155,7 +185,7 @@ export async function resolverParticipante(sock, chatId, numero) {
 
 export async function pasaFiltros(sock, msg, plugin, context) {
   const { chatId, sender } = context;
-  const numero = await resolverNumeroReal(sock, sender);
+  const numero = await resolverNumeroReal(sock, sender, msg);
   const esGrupo = chatId.endsWith("@g.us");
 
   if (plugin.ownerOnly && !esOwner(numero)) {
