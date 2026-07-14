@@ -184,27 +184,7 @@ async function startBot() {
         )
       );
 
-      const esperarSocketListo = async (maxEsperaMs = 20000) => {
-        const inicio = Date.now();
-        while (Date.now() - inicio < maxEsperaMs) {
-          if (sock.ws?.readyState === 1) return true;
-          await new Promise((r) => setTimeout(r, 300));
-        }
-        return false;
-      };
-
-      const pedirCodigoConReintentos = async (intentosRestantes = 3) => {
-        const listo = await esperarSocketListo();
-
-        if (!listo) {
-          console.log(
-            chalk.red(
-              "❌ El socket no llegó a estar listo a tiempo, no se pudo pedir el código."
-            )
-          );
-          return;
-        }
-
+      const pedirCodigoConReintentos = async (intentosRestantes = 4) => {
         try {
           const code = await sock.requestPairingCode(numero.trim());
           console.log(
@@ -219,13 +199,13 @@ async function startBot() {
         } catch (err) {
           const statusCode = err?.output?.statusCode;
 
-          if (statusCode === 428 && intentosRestantes > 0) {
+          if (intentosRestantes > 0) {
             console.log(
               chalk.yellow(
-                `⚠️  WhatsApp respondió 428 (conexión aún no lista), reintentando en 3s... (${intentosRestantes} intento(s) restante(s))`
+                `⚠️  No se pudo pedir el código todavía (${err.message || statusCode}), reintentando en 4s... (${intentosRestantes} intento(s) restante(s))`
               )
             );
-            await new Promise((r) => setTimeout(r, 3000));
+            await new Promise((r) => setTimeout(r, 4000));
             return pedirCodigoConReintentos(intentosRestantes - 1);
           }
 
@@ -233,7 +213,7 @@ async function startBot() {
         }
       };
 
-      pedirCodigoConReintentos();
+      setTimeout(() => pedirCodigoConReintentos(), 2000);
     } else {
       console.log(
         chalk.yellow(
