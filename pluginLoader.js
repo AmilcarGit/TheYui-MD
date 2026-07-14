@@ -7,59 +7,36 @@ import { config } from "./config.js";
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const pluginsPath = path.join(__dirname, "plugins");
 
-const ICONOS_CATEGORIA = {
-  General: "🦋",
-  Info: "🎀",
-  busquedas: "🔭",
-  Descargas: "🌹",
-  Utilidades: "🔧",
-  Grupo: "👑",
-  Economia: "💰",
-  Diversión: "🎮",
-  Anime: "💕",
-  Ai: "🦾",
-  Seguridad: "🛡️",
-  Owner: "💎",
-  Otros: "✨",
-};
-
-const ANCHO = 44;
+const ANCHO = 48;
+const LINEA = "─".repeat(ANCHO);
 
 let ultimoEstadoCarga = { invalidos: [], errores: [] };
+
+const TITULO_GRANDE = "𝗧𝗛𝗘𝗬𝗨𝗜-𝗠𝗗";
+const COLORES_LED = ["#ff2fb0", "#ff5fc2", "#ff8fd4", "#ffb8e6", "#e07bff", "#c04fff", "#a020f0", "#ff2fb0", "#ff5fc2"];
+
+function tituloLed3D() {
+  const letras = [...TITULO_GRANDE];
+
+  const frente = letras
+    .map((c, i) => chalk.hex(COLORES_LED[i % COLORES_LED.length]).bold(c))
+    .join("");
+
+  const sombra = chalk.hex("#3a0a4a")(TITULO_GRANDE);
+  const brillo = chalk.hex("#ff2fb0")("▔".repeat(TITULO_GRANDE.length + 4));
+
+  return `\n   ${frente}\n    ${sombra}\n   ${brillo}\n`;
+}
 
 export function obtenerEstadoUltimaCarga() {
   return ultimoEstadoCarga;
 }
 
-function centrar(texto, ancho) {
-  const visible = texto.replace(/\x1b\[[0-9;]*m/g, "");
-  const espacio = Math.max(0, ancho - visible.length);
-  const izq = Math.floor(espacio / 2);
-  const der = espacio - izq;
-  return " ".repeat(izq) + texto + " ".repeat(der);
-}
-
-function fila(texto = "", color = (t) => t) {
-  const visible = texto.replace(/\x1b\[[0-9;]*m/g, "");
-  const relleno = Math.max(0, ANCHO - visible.length - 4);
-  return (
-    chalk.hex("#e07bff")("┃ ") +
-    color(texto) +
-    " ".repeat(relleno) +
-    chalk.hex("#e07bff")(" ┃")
-  );
-}
-
-function separador(caracterIzq = "┣", caracterDer = "┫") {
-  return chalk.hex("#e07bff")(caracterIzq + "━".repeat(ANCHO - 2) + caracterDer);
-}
-
-function tope() {
-  return chalk.hex("#ff9ecf")("┏" + "━".repeat(ANCHO - 2) + "┓");
-}
-
-function base() {
-  return chalk.hex("#ff9ecf")("┗" + "━".repeat(ANCHO - 2) + "┛");
+function filaConPuntos(etiqueta, valor) {
+  const inicio = `  ${etiqueta} `;
+  const fin = ` ${valor}`;
+  const puntos = Math.max(2, ANCHO - inicio.length - fin.length);
+  return chalk.hex("#e07bff")(inicio) + chalk.gray(".".repeat(puntos)) + chalk.white(fin);
 }
 
 export async function loadPlugins() {
@@ -77,9 +54,9 @@ export async function loadPlugins() {
 
   const total = files.length || 1;
 
-  console.log("");
-  console.log(chalk.hex("#ff9ecf")(centrar("✦ ⋆｡ 　˚ 　★ 　⋆", 50)));
-  console.log(chalk.hex("#e07bff").bold(centrar(`Cargando ${config.botName}`, 50)));
+  console.log(tituloLed3D());
+  console.log(chalk.hex("#d9a9ff")(`  por ${config.creator}`));
+  console.log(chalk.hex("#ff9ecf")(`  ${LINEA}`));
   console.log("");
 
   for (let i = 0; i < files.length; i++) {
@@ -100,7 +77,7 @@ export async function loadPlugins() {
       errores.push({ file, err });
     }
 
-    const barraLargo = 24;
+    const barraLargo = 30;
     const llenos = Math.round(((i + 1) / total) * barraLargo);
     const porcentaje = Math.round(((i + 1) / total) * 100);
     const barra =
@@ -108,7 +85,7 @@ export async function loadPlugins() {
       chalk.gray("·".repeat(barraLargo - llenos));
 
     process.stdout.write(
-      `\r  ${barra}  ${chalk.hex("#e07bff").bold(porcentaje + "%")}   `
+      `\r  Cargando plugins  ${barra}  ${chalk.white(porcentaje + "%")}   `
     );
   }
 
@@ -122,56 +99,39 @@ export async function loadPlugins() {
     categorias[cat] = (categorias[cat] || 0) + 1;
   }
 
-  console.log(tope());
-  console.log(fila(centrar(`🌸 ${config.botName} 🌸`, ANCHO - 4), chalk.white.bold));
-  console.log(fila(centrar(`por ${config.creator}`, ANCHO - 4), chalk.hex("#d9a9ff")));
-  console.log(separador());
-  console.log(
-    fila(
-      `  ✅  ${plugins.length} comando(s) listo(s) para volar`,
-      chalk.greenBright
-    )
-  );
+  console.log(filaConPuntos("Comandos cargados", plugins.length));
+  console.log("");
 
   const nombresCategorias = Object.entries(categorias).sort();
   if (nombresCategorias.length > 0) {
-    console.log(separador());
-    for (let i = 0; i < nombresCategorias.length; i += 2) {
-      const [catA, numA] = nombresCategorias[i];
-      const iconoA = ICONOS_CATEGORIA[catA] || "✨";
-      const colA = `${iconoA} ${catA}: ${numA}`;
-
-      if (nombresCategorias[i + 1]) {
-        const [catB, numB] = nombresCategorias[i + 1];
-        const iconoB = ICONOS_CATEGORIA[catB] || "✨";
-        const colB = `${iconoB} ${catB}: ${numB}`;
-        const colAPad = colA.padEnd(19, " ");
-        console.log(fila(`  ${colAPad} ${colB}`, chalk.hex("#d9a9ff")));
-      } else {
-        console.log(fila(`  ${colA}`, chalk.hex("#d9a9ff")));
-      }
+    for (const [cat, cantidad] of nombresCategorias) {
+      console.log(filaConPuntos(cat, cantidad));
     }
+    console.log("");
   }
 
   if (invalidos.length > 0) {
-    console.log(separador());
-    console.log(fila(`  ⚠️  ${invalidos.length} archivo(s) inválido(s)`, chalk.yellow.bold));
+    console.log(chalk.hex("#ff9ecf")(`  ${LINEA}`));
+    console.log(chalk.yellow.bold(`  ⚠  ${invalidos.length} archivo(s) inválido(s)`));
     for (const file of invalidos) {
-      console.log(fila(`     ‣ ${file}`, chalk.yellow));
+      console.log(chalk.yellow(`     · ${file}`));
     }
+    console.log("");
   }
 
   if (errores.length > 0) {
-    console.log(separador());
-    console.log(fila(`  ❌  ${errores.length} con error al cargar`, chalk.red.bold));
+    console.log(chalk.hex("#ff9ecf")(`  ${LINEA}`));
+    console.log(chalk.red.bold(`  ✕  ${errores.length} con error al cargar`));
     for (const { file, err } of errores) {
-      const mensaje = String(err.message || err).slice(0, 32);
-      console.log(fila(`     ‣ ${file}`, chalk.red));
-      console.log(fila(`       ${mensaje}`, chalk.redBright));
+      const mensaje = String(err.message || err).slice(0, 40);
+      console.log(chalk.red(`     · ${file}`));
+      console.log(chalk.redBright(`       ${mensaje}`));
     }
+    console.log("");
   }
 
-  console.log(base());
+  console.log(chalk.hex("#ff9ecf")(`  ${LINEA}`));
+  console.log(chalk.greenBright(`  ✓  Listo`));
   console.log("");
 
   return plugins;
