@@ -10,7 +10,7 @@ export default {
     const { chatId, sender } = context;
 
     const numeroManual = args[0]?.replace(/\D/g, "");
-    let numero = numeroManual || (await resolverNumeroReal(sock, sender));
+    let numero = numeroManual || (await resolverNumeroReal(sock, sender, msg));
 
     const senderEsLid = sender.endsWith("@lid");
     const idLidCrudo = sender.split("@")[0].split(":")[0].replace(/\D/g, "");
