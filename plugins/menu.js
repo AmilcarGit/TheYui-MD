@@ -1,4 +1,3 @@
-
 import { config } from "../config.js";
 import fs from "fs";
 import path from "path";
@@ -19,7 +18,8 @@ async function obtenerImagenMenu() {
   }
 }
 
-const DIVISOR = "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁";
+const ANCHO = 33;
+const LINEA = "─".repeat(ANCHO);
 
 function formatearUptime(segundos) {
   const d = Math.floor(segundos / 86400);
@@ -31,8 +31,15 @@ function formatearUptime(segundos) {
   return `${m}m ${s}s`;
 }
 
-function fila(etiqueta, valor) {
-  return `   ${etiqueta.padEnd(12, " ")}  ${valor}`;
+function filaConPuntos(etiqueta, valor) {
+  const inicio = `  ${etiqueta} `;
+  const fin = ` ${valor}`;
+  const puntos = Math.max(2, ANCHO - inicio.length - fin.length);
+  return inicio + ".".repeat(puntos) + fin;
+}
+
+function tituloSeccion(texto) {
+  return `\n  *${texto.toUpperCase()}*\n  ${LINEA}`;
 }
 
 export default {
@@ -59,35 +66,33 @@ export default {
     const numero = sender.split("@")[0].split(":")[0];
     const uptime = formatearUptime(process.uptime());
 
-    let texto = `┏━━━━━━━━━━━━━━━━━━━━━━┓\n`;
-    texto += `      ${config.botName.toUpperCase()}\n`;
-    texto += `   Asistente inteligente\n`;
-    texto += `┗━━━━━━━━━━━━━━━━━━━━━━┛\n\n`;
+    let texto = `  ${config.botName.toUpperCase()}\n`;
+    texto += `  Asistente Virtual\n`;
+    texto += `  ${LINEA}\n\n`;
 
-    texto += fila("Usuario", `@${numero}`) + "\n";
-    texto += fila("Creador", config.creator) + "\n";
-    texto += fila("Comandos", totalComandos) + "\n";
-    texto += fila("Plugins", allPlugins.length) + "\n";
-    texto += fila("Actividad", uptime) + "\n";
-    texto += fila("Fecha", fecha) + "\n";
+    texto += filaConPuntos("Usuario", `@${numero}`) + "\n";
+    texto += filaConPuntos("Creador", config.creator) + "\n";
+    texto += filaConPuntos("Comandos", totalComandos) + "\n";
+    texto += filaConPuntos("Plugins", allPlugins.length) + "\n";
+    texto += filaConPuntos("Actividad", uptime) + "\n";
+    texto += filaConPuntos("Fecha", fecha) + "\n";
 
     for (const categoria of nombresCategorias) {
-      texto += `\n${DIVISOR}\n\n`;
-      texto += ` 📂 *${categoria.toUpperCase()}*\n`;
-      texto += `${DIVISOR}\n`;
+      texto += tituloSeccion(categoria) + "\n";
 
-      categorias[categoria].forEach((plugin) => {
+      categorias[categoria].forEach((plugin, i) => {
         const comandoPrincipal = plugin.command[0];
         const alias = plugin.command.slice(1).length > 0
-          ? ` (${plugin.command.slice(1).join(", ")})`
+          ? ` · ${plugin.command.slice(1).join(", ")}`
           : "";
-        texto += `\n ◆ *${comandoPrincipal}*${alias}\n`;
-        texto += `   ${plugin.description || "Sin descripción"}\n`;
+        texto += `  ▸ *${comandoPrincipal}*${alias}\n`;
+        texto += `    ${plugin.description || "Sin descripción"}\n`;
+        if (i < categorias[categoria].length - 1) texto += `\n`;
       });
     }
 
-    texto += `\n${DIVISOR}\n`;
-    texto += ` ${config.botName}  ·  sin prefijo  ·  escribe directo`;
+    texto += `\n  ${LINEA}\n`;
+    texto += `  ${config.botName}  ·  sin prefijo  ·  v${process.env.npm_package_version || "1.0.0"}`;
 
     const imagen = await obtenerImagenMenu();
     if (imagen) {
