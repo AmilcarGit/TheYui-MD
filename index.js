@@ -1,4 +1,12 @@
-import baileysPkg from "@whiskeysockets/baileys";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  fetchLatestBaileysVersion,
+  DisconnectReason,
+  Browsers,
+} = require("@whiskeysockets/baileys");
 import { Boom } from "@hapi/boom";
 import readline from "readline";
 import pino from "pino";
@@ -13,14 +21,6 @@ import { manejarRespuestaInteractiva } from "./interactiveManager.js";
 import { obtenerConfigGrupo } from "./groupSettings.js";
 import * as subbotManager from "./subbotManager.js";
 import { iniciarLimpiezaAutomatica } from "./limpieza.js";
-
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  DisconnectReason,
-  Browsers,
-} = baileysPkg;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -86,7 +86,7 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState(
     config.sessionFolder
   );
-  const { version } = await fetchLatestWaWebVersion();
+  const { version } = await fetchLatestBaileysVersion();
 
   const usePairingCode = !fs.existsSync(
     `${config.sessionFolder}/creds.json`
@@ -184,13 +184,32 @@ async function startBot() {
         )
       );
 
-      setTimeout(async () => {
+      const esperarSocketListo = async (maxEsperaMs = 20000) => {
+        const inicio = Date.now();
+        while (Date.now() - inicio < maxEsperaMs) {
+          if (sock.ws?.readyState === 1) return true;
+          await new Promise((r) => setTimeout(r, 300));
+        }
+        return false;
+      };
+
+      const pedirCodigoConReintentos = async (intentosRestantes = 3) => {
+        const listo = await esperarSocketListo();
+
+        if (!listo) {
+          console.log(
+            chalk.red(
+              "❌ El socket no llegó a estar listo a tiempo, no se pudo pedir el código."
+            )
+          );
+          return;
+        }
+
         try {
           const code = await sock.requestPairingCode(numero.trim());
           console.log(
-            chalk.greenBright(
-              `\n✅ Tu código de vinculación es: `
-            ) + chalk.bold.white(code)
+            chalk.greenBright(`\n✅ Tu código de vinculación es: `) +
+              chalk.bold.white(code)
           );
           console.log(
             chalk.gray(
@@ -198,9 +217,23 @@ async function startBot() {
             )
           );
         } catch (err) {
+          const statusCode = err?.output?.statusCode;
+
+          if (statusCode === 428 && intentosRestantes > 0) {
+            console.log(
+              chalk.yellow(
+                `⚠️  WhatsApp respondió 428 (conexión aún no lista), reintentando en 3s... (${intentosRestantes} intento(s) restante(s))`
+              )
+            );
+            await new Promise((r) => setTimeout(r, 3000));
+            return pedirCodigoConReintentos(intentosRestantes - 1);
+          }
+
           console.log(chalk.red("❌ Error solicitando el código de vinculación:"), err);
         }
-      }, 3000);
+      };
+
+      pedirCodigoConReintentos();
     } else {
       console.log(
         chalk.yellow(
