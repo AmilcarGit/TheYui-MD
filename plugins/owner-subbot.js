@@ -95,13 +95,22 @@ export default {
     try {
       await subbotManager.crearSubbot(numero, {
         onPairingCode: async (code) => {
-          await sock.sendMessage(chatId, {
+          const enviado = await sock.sendMessage(chatId, {
             text:
               `🦋 *Código de vinculación para el subbot*\n\n` +
               `📱 Número: ${numero}\n` +
               `🔑 Código: *${code}*\n\n` +
-              `Ve a WhatsApp > Dispositivos vinculados > Vincular con número de teléfono, e ingresa el código.`,
+              `Ve a WhatsApp > Dispositivos vinculados > Vincular con número de teléfono, e ingresa el código.\n\n` +
+              `⏱️ _Este mensaje se autoeliminará en 1 minuto por seguridad._`,
           });
+
+          setTimeout(async () => {
+            try {
+              await sock.sendMessage(chatId, { delete: enviado.key });
+            } catch (_) {
+              // Si ya no se puede borrar (chat cerrado, sin permisos, etc.) se ignora.
+            }
+          }, 60 * 1000);
         },
         onEstado: async (texto) => {
           try {
