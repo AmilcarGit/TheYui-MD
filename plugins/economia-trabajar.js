@@ -48,6 +48,7 @@ const TRABAJOS = [
 export default {
   command: ["trabajar", "work"],
   category: "Economia",
+  requiereRegistro: true,
   description: "Trabaja para ganar Yui (cada 1 hora). Las mejoras aumentan tus ganancias.",
   run: async (sock, msg, args, context) => {
     const { sender, chatId } = context;
