@@ -3,6 +3,7 @@ import { obtenerUsuario, guardarUsuario, formatearMonto } from "../economyDB.js"
 export default {
   command: ["transferir", "pagar", "dar"],
   category: "Economia",
+  requiereRegistro: true,
   description: "Transfiere Yui a otro usuario. Uso: transferir <monto> (mencionando o respondiendo a alguien).",
 
   run: async (sock, msg, args, context) => {
