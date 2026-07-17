@@ -6,6 +6,7 @@ const VEINTICUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 export default {
   command: ["diario", "daily"],
   category: "Economia",
+  requiereRegistro: true,
   description: "Reclama tu recompensa diaria de Yui (cada 24 horas).",
 
   run: async (sock, msg, args, context) => {
