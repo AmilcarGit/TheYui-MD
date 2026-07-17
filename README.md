@@ -30,6 +30,10 @@ Bot de WhatsApp **sin prefijo**, construido sobre [Baileys](https://github.com/W
 ## 🚀 Instalación
 
 ```bash
+termux-setup-storage
+apt update
+apt upgrade -y
+pkg install -y git nodejs ffmpeg imagemagick
 git clone https://github.com/AmilcarGit/TheYui-MD.git
 cd TheYui-MD
 npm install
