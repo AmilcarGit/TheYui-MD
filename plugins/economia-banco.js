@@ -3,6 +3,7 @@ import { obtenerUsuario, guardarUsuario, formatearMonto } from "../economyDB.js"
 export default {
   command: ["depositar", "retirar"],
   category: "Economia",
+  requiereRegistro: true,
   description: "Deposita o retira Yui del banco. Uso: depositar <monto> / retirar <monto>",
 
   run: async (sock, msg, args, context) => {
