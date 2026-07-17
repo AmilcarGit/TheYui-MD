@@ -8,6 +8,7 @@ const PENALIZACION = 0.3;
 export default {
   command: ["prestamo", "pagarprestamo"],
   category: "Economia",
+  requiereRegistro: true,
   description: "Pide un préstamo al banco o págalo. Uso: prestamo <monto> / pagarprestamo",
 
   run: async (sock, msg, args, context) => {
