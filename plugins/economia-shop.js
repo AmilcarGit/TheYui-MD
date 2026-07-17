@@ -86,6 +86,7 @@ const ITEMS = [
 export default {
   command: ["tienda", "shop"],
   category: "Economia",
+  requiereRegistro: true,
   description: "Muestra la tienda con items que te hacen ganar más dinero.",
   run: async (sock, msg, args, context) => {
     const { chatId } = context;
