@@ -3,6 +3,7 @@ import { obtenerUsuario, formatearMonto } from "../economyDB.js";
 export default {
   command: ["saldo", "balance", "bal"],
   category: "Economia",
+  requiereRegistro: true,
   description: "Muestra tu saldo en efectivo y en el banco.",
 
   run: async (sock, msg, args, context) => {
