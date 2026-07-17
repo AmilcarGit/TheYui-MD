@@ -13,6 +13,7 @@ function obtenerObjetivo(msg) {
 export default {
   command: ["regalar"],
   category: "Economia",
+  requiereRegistro: true,
   description: "Regala Yui a otro usuario, sin comisión.",
 
   run: async (sock, msg, args, context) => {
