@@ -10,7 +10,7 @@ export const config = {
   apis: {
     edward: {
       baseUrl: "https://dv-edward.onrender.com",
-      apiKey: "edward",
+      apiKey: "EdwardwEqIgrqU",
     },
   },
 };
